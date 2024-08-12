@@ -1,0 +1,98 @@
+[
+  {
+    "id": "campground",
+    "name": "Food Stealer",
+    "description": "Steal food from the campground",
+    "cooldown": 30,
+    "earning_max": 30,
+    "earning_min": 20
+  },
+  {
+    "id": "fishing",
+    "name": "Fisher",
+    "description": "Catch fish to sell",
+    "cooldown": 60,
+    "earning_max": 50,
+    "earning_min": 40
+  },
+  {
+    "id": "taxi",
+    "name": "Taxi Driver",
+    "description": "Drive people around Sasquatch Valley to earn money",
+    "cooldown": 75,
+    "earning_max": 80,
+    "earning_min": 50
+  },
+  {
+    "id": "delivery",
+    "name": "Delivery Driver",
+    "description": "Deliver packages around Sasquatch Valley",
+    "cooldown": 90,
+    "earning_max": 100,
+    "earning_min": 60
+  },
+  {
+    "id": "newspaper",
+    "name": "Photographer",
+    "description": "Take photos for the newspaper",
+    "cooldown": 120,
+    "earning_max": 220,
+    "earning_min": 150
+  },
+  {
+    "id": "paramedic",
+    "name": "Paramedic",
+    "description": "Rescue injured people throughout Sasquatch Valley",
+    "cooldown": 150,
+    "earning_max": 300,
+    "earning_min": 200
+  },
+  {
+    "id": "police",
+    "name": "Police Officer",
+    "description": "Pull over speeders and write tickets",
+    "cooldown": 180,
+    "earning_max": 600,
+    "earning_min": 200
+  },
+  {
+    "id": "doctor",
+    "name": "Doctor",
+    "description": "Help cure sick people",
+    "cooldown": 220,
+    "earning_max": 1200,
+    "earning_min": 600
+  },
+  {
+    "id": "ferry",
+    "name": "Ferry Capitan",
+    "description": "Drive the ferry to the island and sell food",
+    "cooldown": 240,
+    "earning_max": 1200,
+    "earning_min": 900
+  },
+  {
+    "id": "trash",
+    "name": "Trash Diver",
+    "description": "Dive for trash underwater to save the environment",
+    "cooldown": 300,
+    "earning_max": 2000,
+    "earning_min": 1500
+  },
+  {
+    "id": "mushroom",
+    "name": "Mushroom Collector",
+    "description": "Collect mushrooms and sell them to the Mushroom Lady",
+    "cooldown": 300,
+    "earning_max": 2000,
+    "earning_min": 1500
+  },
+  {
+    "id": "port",
+    "name": "Port Robber",
+    "description": "Rob the port and crack open crates",
+    "cooldown": 600,
+    "earning_max": 5000,
+    "earning_min": 3000
+  }
+]
