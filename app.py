@@ -84,13 +84,62 @@ async def bal(ctx):
       bank_info = f"""**Bank**
       Bank Balance: {bank_balance}
       Bank Level: {bank_lvl}"""
-    embed = discord.Embed(title=f"{user_publicname}'s Balance", description=f"""**Coin Balance**
-{balance}
+    embed = discord.Embed(title=f"{user_publicname}'s Balance", description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", color=0x00ff00)
+  await ctx.reply(embed=embed)
 
-{bank_info}""", color=0x00ff00)
-    await ctx.reply(embed=embed)
+shop_items = [
+  {"name": "Item 1", "description": "This is item 1.", "price": 100},
+  {"name": "Item 2", "description": "This is item 2.", "price": 200},
+  {"name": "Fox Mischief.", "description": "Very Mischief.", "price": 300},
+]
 
+# Function to create the embed for the shop
+def create_shop_embed(index):
+  item = shop_items[index]
+  embed = discord.Embed(
+    title=f"Shop - {item['name']}",
+    description=item['description'],
+    color=0x00ff00
+  )
+  embed.add_field(name="Price", value=f"{item['price']} coins")
+  embed.set_footer(text=f"Page {index + 1} of {len(shop_items)}")
+  return embed
 
+@client.command()
+async def shop(ctx):
+  current_index = 0
+  message = await ctx.send(embed=create_shop_embed(current_index))
+
+  # Add reactions for navigation and buying
+  await message.add_reaction('⬅️')
+  await message.add_reaction('💰')
+  await message.add_reaction('➡️')
+
+  def check(reaction, user):
+    return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+  while True:
+    try:
+      reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+      if str(reaction.emoji) == '⬅️':
+        current_index = (current_index - 1) % len(shop_items)
+        await message.edit(embed=create_shop_embed(current_index))
+        await message.remove_reaction(reaction, user)
+
+      elif str(reaction.emoji) == '➡️':
+        current_index = (current_index + 1) % len(shop_items)
+        await message.edit(embed=create_shop_embed(current_index))
+        await message.remove_reaction(reaction, user)
+
+      elif str(reaction.emoji) == '💰':
+        print("Trying to buy")
+        item = shop_items[current_index]
+        await message.remove_reaction(reaction, user)
+        await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+
+    except Exception as e:
+      break
 
 @client.command()
 async def help(ctx):
