@@ -4,21 +4,20 @@ This is Adam The Great's interpretation of Sasbot. It contains an economy, and s
 
 **ECONOMY**
 Make money using `|work`
-Explore other jobs using `|job`
+Explore other jobs using `|jobs`
 Buy useful items in the shop with `|shop`
 Check how many coins you have with `|bal`
 See your inventory with `|inv`
-Use the bank using `|dep` and `|with`
 
 **FUN**
 View a random Sneaky Sasquatch meme with `|meme` ||If you would like to submit a meme, run `|submitmeme`.||
 
-There will be more commands in future versions!
--# Version 0.1.0 (Test version)
+This is just an early proof of conecpt.
+-# Version 0.1.0
 """
 
 welcome_output = f"""
-You seem to be new here! I have ignored your previous command and have setup your profile with default values and a coin balance of 0.
+Thank you for testing out this bot! It is currently a really early proof of concept. Many features are missing, and the bot is overall pretty buggy. 
 
 To start making coins, run `|work`.
 Keep an eye on your hunger bar! If it hits 0, there will be consequences. To fill it, run `|eat [food]`, where food is the name of the food you want to eat.
@@ -113,4 +112,4 @@ id_to_name = {
   "shoes": "Shoes Upgrade"
 }
 
-jobs = ["campground", "fishing", "taxi", "delivery", "newspaper", "paramedic", "police" "doctor", "ferry", "trash", "mushroom", "port"]
+jobs_list = ["campground", "fishing", "taxi", "delivery", "newspaper", "paramedic", "police", "doctor", "ferry", "trash", "mushroom", "port"]

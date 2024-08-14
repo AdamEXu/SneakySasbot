@@ -4,6 +4,7 @@ import data_handler
 import datetime
 import random
 from definitions import *
+import os
 
 intents = discord.Intents.all()
 
@@ -278,46 +279,58 @@ async def display_special_shop(ctx):
             break
 
 def create_job_embed(index):
-    job = jobs[index]
+    job = jobs_list[index]
     job_info = data_handler.get_job_data(job)
     embed = discord.Embed(
-        title=f"Job - {job}",
+        title=f"Job - {job_info['name']}",
         description=job_info['description'],
         color=0x00ff00
     )
     embed.add_field(name="Earnings", value=f"{job_info['earning_min']} - {job_info['earning_max']} coins")
     embed.add_field(name="Cooldown", value=f"{job_info['cooldown']} seconds")
-    embed.add_field(name="Cost to Apply", value=f"{job_info['cooldown']} seconds")
-    embed.set_footer(text=f"Page {index + 1} of {len(jobs)}")
+    embed.add_field(name="Cost to Apply", value=f"{job_info['cost']} coins")
+    embed.set_footer(text=f"Page {index + 1} of {len(jobs_list)}")
     return embed
 
 @client.command()
-def jobs(ctx):
+async def jobs(ctx):
     current_index = 0
-    message = ctx.send(embed=create_job_embed(current_index))
+    message = await ctx.send(embed=create_job_embed(current_index))
 
-    message.add_reaction('⬅️')
-    message.add_reaction('💼')
-    message.add_reaction('➡️')
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💼')
+    await message.add_reaction('➡️')
 
     def check(reaction, user):
         return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💼']
 
     while True:
         try:
-            reaction, user = client.wait_for('reaction_add', timeout=60.0, check=check)
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
 
             if str(reaction.emoji) == '⬅️':
-                current_index = (current_index - 1) % len(jobs)
-                message.edit(embed=create_job_embed(current_index))
-                message.remove_reaction(reaction, user)
+                await message.remove_reaction(reaction, user)
+                current_index = (current_index - 1) % len(jobs_list)
+                await message.edit(embed=create_job_embed(current_index))
 
             elif str(reaction.emoji) == '➡️':
-                current_index = (current_index + 1) % len(jobs)
-                message.edit(embed=create_job_embed(current_index))
-                message.remove_reaction(reaction, user)
-            
+                await message.remove_reaction(reaction, user)
+                current_index = (current_index + 1) % len(jobs_list)
+                await message.edit(embed=create_job_embed(current_index))
 
+            elif str(reaction.emoji) == '💼':
+                job = jobs_list[current_index]
+                user_data = data_handler.get_user_data(ctx.author.id)
+                job_data = data_handler.get_job_data(job)
+                
+                if user_data['coin_balance'] < job_data['cost']:
+                    await ctx.send("You do not have enough coins to apply for this job.")
+                else:
+                    user_data['coin_balance'] -= job_data['cost']
+                    user_data['work_job'] = job
+                    user_data['last_work'] = 0
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have applied for the job {job}! Your work cooldown has been reset. Use |work to start working.")
 
         except Exception as e:
             break
@@ -326,4 +339,4 @@ def jobs(ctx):
 async def help(ctx):
   await ctx.send(help_output)
 
-client.run('')
+client.run(os.getenv('TOKEN'))

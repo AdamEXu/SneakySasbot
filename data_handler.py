@@ -1,4 +1,5 @@
 import json
+import datetime
 def ensure_user_in_json(user_id):
   with open('data.json', 'r') as f:
     users = json.load(f)
@@ -23,7 +24,9 @@ def ensure_user_in_json(user_id):
       "bank_balance": 0,
       "bank_lvl": 0,
       "earnings": 0,
-      "shoe_lvl": 0
+      "shoe_lvl": 0,
+      "early_tester": True,
+      "date_joined": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
     with open('data.json', 'w') as f:
       json.dump(users, f)

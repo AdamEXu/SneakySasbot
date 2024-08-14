@@ -1,7 +1,7 @@
 [
   {
     "id": "campground",
-    "name": "Food Stealer",
+    "name": "<:basket:1273386133459570799> Food Stealer",
     "description": "Steal food from the campground",
     "cooldown": 30,
     "earning_max": 30,
@@ -10,7 +10,7 @@
   },
   {
     "id": "fishing",
-    "name": "Fisher",
+    "name": "<:fishing_rod:1273386200186617876> Fisher",
     "description": "Catch fish to sell",
     "cooldown": 60,
     "earning_max": 50,
@@ -19,7 +19,7 @@
   },
   {
     "id": "taxi",
-    "name": "Taxi Driver",
+    "name": "<:taxi:1273386300400996575> Taxi Driver",
     "description": "Drive people around Sasquatch Valley to earn money",
     "cooldown": 75,
     "earning_max": 80,
@@ -28,7 +28,7 @@
   },
   {
     "id": "delivery",
-    "name": "Delivery Driver",
+    "name": "<:delivery_van:1273386156452741180> Delivery Driver",
     "description": "Deliver packages around Sasquatch Valley",
     "cooldown": 90,
     "earning_max": 100,
@@ -37,7 +37,7 @@
   },
   {
     "id": "newspaper",
-    "name": "Photographer",
+    "name": "<:camera:1273386121065267291> Photographer",
     "description": "Take photos for the newspaper",
     "cooldown": 120,
     "earning_max": 220,
@@ -46,7 +46,7 @@
   },
   {
     "id": "paramedic",
-    "name": "Paramedic",
+    "name": "<:ambulance:1273385839560228865> Paramedic",
     "description": "Rescue injured people throughout Sasquatch Valley",
     "cooldown": 150,
     "earning_max": 300,
@@ -55,7 +55,7 @@
   },
   {
     "id": "police",
-    "name": "Police Officer",
+    "name": "<:police_car:1273386292201259048> Police Officer",
     "description": "Pull over speeders and write tickets",
     "cooldown": 180,
     "earning_max": 600,
@@ -64,7 +64,7 @@
   },
   {
     "id": "doctor",
-    "name": "Doctor",
+    "name": "<:doctor:1273386144251510784> Doctor",
     "description": "Help cure sick people",
     "cooldown": 220,
     "earning_max": 1200,
@@ -73,7 +73,7 @@
   },
   {
     "id": "ferry",
-    "name": "Ferry Capitan",
+    "name": "<:ferry:1273386274312687756> Ferry Capitan",
     "description": "Drive the ferry to the island and sell food",
     "cooldown": 240,
     "earning_max": 1200,
@@ -82,7 +82,7 @@
   },
   {
     "id": "trash",
-    "name": "Trash Diver",
+    "name": "<:diver:1273386181547003958> Trash Diver",
     "description": "Dive for trash underwater to save the environment",
     "cooldown": 300,
     "earning_max": 2000,
@@ -91,18 +91,20 @@
   },
   {
     "id": "mushroom",
-    "name": "Mushroom Collector",
+    "name": "<:mushroom:1273386282877321246> Mushroom Collector",
     "description": "Collect mushrooms and sell them to the Mushroom Lady",
     "cooldown": 300,
     "earning_max": 2000,
-    "earning_min": 1500
+    "earning_min": 1500,
+    "cost": 3000
   },
   {
     "id": "port",
-    "name": "Port Robber",
+    "name": "<:forklift:1273386211561439262> Port Robber",
     "description": "Rob the port and crack open crates",
     "cooldown": 600,
     "earning_max": 5000,
-    "earning_min": 3000
+    "earning_min": 3000,
+    "cost": 10000
   }
 ]
