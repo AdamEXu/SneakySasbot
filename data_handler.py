@@ -17,6 +17,7 @@ def ensure_user_in_json(user_id):
       "last_work": 0,
       "vehicles": [],
       "vehicle": "",
+      "inventory": [],
       "hunger": 6,
       "hunger_max": 6,
       "bank_balance": 0,

@@ -3,39 +3,11 @@ from discord.ext import commands
 import data_handler
 import datetime
 import random
-
-help_output = """
-## Sasbot Help
-This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
-
-**ECONOMY**
-Make money using `|work`
-Explore other jobs using `|job`
-Buy useful items in the shop with `|shop`
-Check how many coins you have with `|bal`
-See your inventory with `|inv`
-Use the bank using `|dep` and `|with`
-
-**FUN**
-View a random Sneaky Sasquatch meme with `|meme` ||If you would like to submit a meme, run `|submitmeme`.||
-
-There will be more commands in future versions!
--# Version 0.1.0 (Test version)
-"""
-
-welcome_output = f"""
-You seem to be new here! I have ignored your previous command and have setup your profile with default values and a coin balance of 0.
-
-To start making coins, run `|work`.
-Keep an eye on your hunger bar! If it hits 0, there will be consequences. To fill it, run `|eat [food]`, where food is the name of the food you want to eat.
-To see what is in your inventory (and see what food you have to eat), run `|inv`.
-
-Take a look at `|help` for more information.
-"""
+from definitions import *
 
 intents = discord.Intents.all()
 
-client = commands.Bot(command_prefix='|', description="Test", intents=intents, help_command=None)
+client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>'], description="Test", intents=intents, help_command=None)
 
 @client.event
 async def on_ready():
@@ -87,59 +59,268 @@ async def bal(ctx):
     embed = discord.Embed(title=f"{user_publicname}'s Balance", description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", color=0x00ff00)
   await ctx.reply(embed=embed)
 
-shop_items = [
-  {"name": "Item 1", "description": "This is item 1.", "price": 100},
-  {"name": "Item 2", "description": "This is item 2.", "price": 200},
-  {"name": "Fox Mischief.", "description": "Very Mischief.", "price": 300},
-]
+@client.command()
+async def inv(ctx):
+    user_id = ctx.author.id
+    user_in_json = data_handler.ensure_user_in_json(user_id)
+    if user_in_json:
+        await ctx.reply(welcome_output)
+    else:
+        user_data = data_handler.get_user_data(user_id)
+        inventory = user_data['inventory']
+        inventory_list = ""
+        for item in inventory:
+            inventory_list += f"* {id_to_name[item]}\n"
+        embed = discord.Embed(title=f"{ctx.author.display_name}'s Inventory", description=inventory_list, color=0x00ff00)
+        await ctx.reply(embed=embed)
 
-# Function to create the embed for the shop
-def create_shop_embed(index):
-  item = shop_items[index]
-  embed = discord.Embed(
-    title=f"Shop - {item['name']}",
-    description=item['description'],
-    color=0x00ff00
-  )
-  embed.add_field(name="Price", value=f"{item['price']} coins")
-  embed.set_footer(text=f"Page {index + 1} of {len(shop_items)}")
-  return embed
+def create_shop_embed(index, shop, shop_name):
+    item = shop[index]
+    embed = discord.Embed(
+        title=f"{shop_name} - {item['name']}",
+        description=item['description'],
+        color=0x00ff00
+    )
+    embed.add_field(name="Price", value=f"{item['price']} coins")
+    embed.set_footer(text=f"Page {index + 1} of {len(shop)}")
+    return embed
 
 @client.command()
-async def shop(ctx):
-  current_index = 0
-  message = await ctx.send(embed=create_shop_embed(current_index))
+async def shop(ctx, shop_name=None):
+    if shop_name:
+        if shop_name.lower() == "food" or shop_name.lower() == "foods":
+            await display_food_shop(ctx)
+        elif shop_name.lower() == "vehicle" or shop_name.lower() == "vehicles" or shop_name.lower() == "car" or shop_name.lower() == "cars":
+            await display_vehicle_shop(ctx)
+        elif shop_name.lower() == "special" or shop_name.lower() == "specials":
+            await display_special_shop(ctx)
+    embed = discord.Embed(
+        title="Select a Shop",
+        description="Please select a shop by clicking on one of the reactions below:\n\n"
+                    "🍔 Food Shop\n"
+                    "🚗 Vehicle Shop\n"
+                    "✨ Special Shop",
+        color=0x00ff00
+    )
+    embed.set_footer(text="Tip: Next time, you can use |shop [shop name] to directly access a shop. For example, |shop food to access the food shop.")
 
-  # Add reactions for navigation and buying
-  await message.add_reaction('⬅️')
-  await message.add_reaction('💰')
-  await message.add_reaction('➡️')
+    message = await ctx.send(embed=embed)
+    await message.add_reaction('🍔')
+    await message.add_reaction('🚗')
+    await message.add_reaction('✨')
 
-  def check(reaction, user):
-    return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🍔', '🚗', '✨']
 
-  while True:
     try:
-      reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+        reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
 
-      if str(reaction.emoji) == '⬅️':
-        current_index = (current_index - 1) % len(shop_items)
-        await message.edit(embed=create_shop_embed(current_index))
-        await message.remove_reaction(reaction, user)
+        if str(reaction.emoji) == '🍔':
+            await message.delete()
+            await display_food_shop(ctx)
 
-      elif str(reaction.emoji) == '➡️':
-        current_index = (current_index + 1) % len(shop_items)
-        await message.edit(embed=create_shop_embed(current_index))
-        await message.remove_reaction(reaction, user)
+        elif str(reaction.emoji) == '🚗':
+            await message.delete()
+            await display_vehicle_shop(ctx)
 
-      elif str(reaction.emoji) == '💰':
-        print("Trying to buy")
-        item = shop_items[current_index]
-        await message.remove_reaction(reaction, user)
-        await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+        elif str(reaction.emoji) == '✨':
+            await message.delete()
+            await display_special_shop(ctx)
 
     except Exception as e:
-      break
+        print(e)
+
+async def display_food_shop(ctx):
+    current_index = 0
+    message = await ctx.send(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=15.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(food_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(food_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                item = food_shop_items[current_index]
+                await message.remove_reaction(reaction, user)
+                user_data = data_handler.get_user_data(ctx.author.id)
+                if user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this item.")
+                else:
+                    user_data['coin_balance'] -= item['price']
+                    user_data['inventory'].append(item['id'])
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+        except Exception as e:
+            print(e)
+            break
+
+def create_vehicle_embed(user_id, index):
+    item = vehicle_shop_items[index]
+    user_info = data_handler.get_user_data(user_id)
+    if item["id"] in user_info["vehicles"]:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Owned", value=f"You bought this vehicle for {item['price']} coins")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+    else:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Price", value=f"This vehicle costs {item['price']} coins")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+
+async def display_vehicle_shop(ctx):
+    current_index = 0
+    message = await ctx.send(embed=create_vehicle_embed(ctx.author.id, current_index))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(vehicle_shop_items)
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(vehicle_shop_items)
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                item = vehicle_shop_items[current_index]
+                await message.remove_reaction(reaction, user)
+                user_data = data_handler.get_user_data(ctx.author.id)
+                if user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this vehicle.")
+                else:
+                    user_data['coin_balance'] -= item['price']
+                    user_data['vehicles'].append(item['id'])
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+        except Exception as e:
+            break
+
+async def display_special_shop(ctx):
+    await ctx.send("Special Shop coming soon!")
+    return
+    current_index = 0
+    message = await ctx.send(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(special_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(special_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                item = special_shop_items[current_index]
+                await message.remove_reaction(reaction, user)
+                user_data = data_handler.get_user_data(ctx.author.id)
+                if item['upgradeable'] and item['id'] in user_data['upgrades']:
+                    await ctx.send(f"You already own and upgraded {item['name']}.")
+                elif user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this item.")
+                else:
+                    user_data['coin_balance'] -= item['price']
+                    if item['upgradeable']:
+                        user_data['upgrades'].append(item['id'])
+                    else:
+                        user_data['inventory'].append(item['id'])
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+        except Exception as e:
+            break
+
+def create_job_embed(index):
+    job = jobs[index]
+    job_info = data_handler.get_job_data(job)
+    embed = discord.Embed(
+        title=f"Job - {job}",
+        description=job_info['description'],
+        color=0x00ff00
+    )
+    embed.add_field(name="Earnings", value=f"{job_info['earning_min']} - {job_info['earning_max']} coins")
+    embed.add_field(name="Cooldown", value=f"{job_info['cooldown']} seconds")
+    embed.add_field(name="Cost to Apply", value=f"{job_info['cooldown']} seconds")
+    embed.set_footer(text=f"Page {index + 1} of {len(jobs)}")
+    return embed
+
+@client.command()
+def jobs(ctx):
+    current_index = 0
+    message = ctx.send(embed=create_job_embed(current_index))
+
+    message.add_reaction('⬅️')
+    message.add_reaction('💼')
+    message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💼']
+
+    while True:
+        try:
+            reaction, user = client.wait_for('reaction_add', timeout=60.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(jobs)
+                message.edit(embed=create_job_embed(current_index))
+                message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(jobs)
+                message.edit(embed=create_job_embed(current_index))
+                message.remove_reaction(reaction, user)
+            
+
+
+        except Exception as e:
+            break
 
 @client.command()
 async def help(ctx):

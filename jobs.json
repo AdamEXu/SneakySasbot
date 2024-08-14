@@ -5,7 +5,8 @@
     "description": "Steal food from the campground",
     "cooldown": 30,
     "earning_max": 30,
-    "earning_min": 20
+    "earning_min": 20,
+    "cost": 0
   },
   {
     "id": "fishing",
@@ -13,7 +14,8 @@
     "description": "Catch fish to sell",
     "cooldown": 60,
     "earning_max": 50,
-    "earning_min": 40
+    "earning_min": 40,
+    "cost": 50
   },
   {
     "id": "taxi",
@@ -21,7 +23,8 @@
     "description": "Drive people around Sasquatch Valley to earn money",
     "cooldown": 75,
     "earning_max": 80,
-    "earning_min": 50
+    "earning_min": 50,
+    "cost": 120
   },
   {
     "id": "delivery",
@@ -29,7 +32,8 @@
     "description": "Deliver packages around Sasquatch Valley",
     "cooldown": 90,
     "earning_max": 100,
-    "earning_min": 60
+    "earning_min": 60,
+    "cost": 200
   },
   {
     "id": "newspaper",
@@ -37,7 +41,8 @@
     "description": "Take photos for the newspaper",
     "cooldown": 120,
     "earning_max": 220,
-    "earning_min": 150
+    "earning_min": 150,
+    "cost": 300
   },
   {
     "id": "paramedic",
@@ -45,7 +50,8 @@
     "description": "Rescue injured people throughout Sasquatch Valley",
     "cooldown": 150,
     "earning_max": 300,
-    "earning_min": 200
+    "earning_min": 200,
+    "cost": 500
   },
   {
     "id": "police",
@@ -53,7 +59,8 @@
     "description": "Pull over speeders and write tickets",
     "cooldown": 180,
     "earning_max": 600,
-    "earning_min": 200
+    "earning_min": 200,
+    "cost": 700
   },
   {
     "id": "doctor",
@@ -61,7 +68,8 @@
     "description": "Help cure sick people",
     "cooldown": 220,
     "earning_max": 1200,
-    "earning_min": 600
+    "earning_min": 600,
+    "cost": 1000
   },
   {
     "id": "ferry",
@@ -69,7 +77,8 @@
     "description": "Drive the ferry to the island and sell food",
     "cooldown": 240,
     "earning_max": 1200,
-    "earning_min": 900
+    "earning_min": 900,
+    "cost": 2000
   },
   {
     "id": "trash",
@@ -77,7 +86,8 @@
     "description": "Dive for trash underwater to save the environment",
     "cooldown": 300,
     "earning_max": 2000,
-    "earning_min": 1500
+    "earning_min": 1500,
+    "cost": 3000
   },
   {
     "id": "mushroom",
