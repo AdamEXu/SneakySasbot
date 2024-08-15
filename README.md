@@ -42,3 +42,26 @@ This is just a list of ideas that will be implemented in the near future. If you
 ## Credits
 - **Sneaky Sasquatch** - Inspiration for the bot's name and economy system.
 - **[discord.py](https://github.com/Rapptz/discord.py)** - I HATE discord.py. But stupid me from a few days ago decided to use it. So I either have to rewrite the entire bot or just keep using it. I'm going to keep using it. But I still hate it. I REALLY REALLY hate discord.py. I wish that I had used something else. I also regret not using slash commands. How hard could they have been to implement?
+
+## Installation
+First, clone the repository.
+```bash
+git clone https://github.com/Speedrun
+```
+
+Then, install the required packages.
+```bash
+pip install -r requirements.txt
+```
+
+Now, get a bot token from Discord's developer portal, and set it into the enviroment variable.
+```bash
+export TOKEN=1234567890HACK.CLUBARCADE.WWWWWWWWWWWWWWWWWWWWW
+```
+
+Finally, run the bot.
+```bash
+python app.py
+```
+
+Alternatively, just add the bot to your server using [this link](https://discord.com/oauth2/authorize?client_id=1272666435063251057&permissions=8&integration_type=0&scope=bot). Sorry about the admin permissions, I'll figure out which ones I actually need when I actually finish the bot. Additionally, I have not put it onto a VPS yet so it'll be down 90% of the time as of right now. However, that will change in the future.
