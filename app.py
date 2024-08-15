@@ -25,18 +25,34 @@ async def work(ctx):
     user_job = user_data['work_job']
     last_work = user_data['last_work']
     job_data = data_handler.get_job_data(user_job)
-    if last_work + job_data['cooldown'] > datetime.datetime.now().timestamp():
-      seconds = datetime.timedelta(seconds=last_work + job_data['cooldown'] - datetime.datetime.now().timestamp()).seconds
-      await ctx.reply(f"Please wait {seconds} seconds before working again.")
+    user_vehicle = user_data['vehicle']
+    vehicle_modifer = 1
+    calc_cooldown = job_data['cooldown']
+    if user_vehicle != '':
+        vehicle_modifer = vehicle_modifers[user_vehicle]
+        calc_cooldown = job_data['cooldown'] * vehicle_modifer
+    boost_message = ""
+    if vehicle_modifer < 1:
+        rounded_modifer = round((1 - vehicle_modifer) * 100)
+        boost_message = f"Your {id_to_name[user_vehicle]} is boosting your cooldown by {rounded_modifer}%!"
+    if last_work + calc_cooldown > datetime.datetime.now().timestamp():
+        seconds = round(last_work + calc_cooldown - datetime.datetime.now().timestamp())
+        embed = discord.Embed(title="Work", description=f"You can work again in {seconds} seconds.\n{boost_message}", color=0xff0000)
+        await ctx.reply(embed=embed)
     else:
-      earning_min = job_data['earning_min']
-      earning_max = job_data['earning_max']
-      earnings = random.randint(earning_min, earning_max)
-      user_data['last_work'] = datetime.datetime.now().timestamp()
-      user_data['coin_balance'] += earnings
-      user_data['earnings'] += earnings
-      data_handler.save_user_data(user_id, user_data)
-      await ctx.reply(f"You have earned {earnings} coins.")
+        earning_min = job_data['earning_min']
+        earning_max = job_data['earning_max']
+        earnings = random.randint(earning_min, earning_max)
+        user_data['last_work'] = datetime.datetime.now().timestamp()
+        user_data['coin_balance'] += earnings
+        user_data['earnings'] += earnings
+        data_handler.save_user_data(user_id, user_data)
+        random_work_messages = work_messages[user_data['work_job']]
+        random_work_message = random.choice(random_work_messages)
+        user_data['hunger'] -= 1
+        work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again in {calc_cooldown} seconds.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
+        embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
+        await ctx.reply(embed=embed)
 
 @client.command()
 async def bal(ctx):
@@ -58,6 +74,8 @@ async def bal(ctx):
       Bank Balance: {bank_balance}
       Bank Level: {bank_lvl}"""
     embed = discord.Embed(title=f"{user_publicname}'s Balance", description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", color=0x00ff00)
+  embed.add_field(name="Total Earnings (Lifetime)", value=user_data['earnings'])
+  embed.add_field(name="Hunger Bar", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
   await ctx.reply(embed=embed)
 
 @client.command()
@@ -72,7 +90,13 @@ async def inv(ctx):
         inventory_list = ""
         for item in inventory:
             inventory_list += f"* {id_to_name[item]}\n"
-        embed = discord.Embed(title=f"{ctx.author.display_name}'s Inventory", description=inventory_list, color=0x00ff00)
+        vehicle_list = ""
+        for vehicle in user_data['vehicles']:
+            vehicle_list += f"* {id_to_name[vehicle]}\n"
+        embed = discord.Embed(title=f"{ctx.author.display_name}'s Inventory", description=f"Hunger Bar: {user_data['hunger']} / {user_data['hunger_max']}", color=0x00ff00)
+        embed.add_field(name="Food Items", value=inventory_list)
+        embed.add_field(name="Vehicles", value=vehicle_list)
+        embed.add_field(name="Current Vehicle", value=id_to_name[user_data['vehicle']])
         await ctx.reply(embed=embed)
 
 def create_shop_embed(index, shop, shop_name):
@@ -174,13 +198,22 @@ async def display_food_shop(ctx):
 def create_vehicle_embed(user_id, index):
     item = vehicle_shop_items[index]
     user_info = data_handler.get_user_data(user_id)
-    if item["id"] in user_info["vehicles"]:
+    if item["id"] == user_info["vehicle"]:
         embed = discord.Embed(
             title=f"Vehicle Shop - {item['name']}",
             description=item['description'],
             color=0x00ff00
         )
-        embed.add_field(name="Owned", value=f"You bought this vehicle for {item['price']} coins")
+        embed.add_field(name="Owned", value="Currently equipped as your active vehicle.")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+    elif item["id"] in user_info["vehicles"]:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Owned", value=f"Click 💰 to equip it as your current vehicle and gain its bonus.")
         embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
         return embed
     else:
@@ -224,11 +257,16 @@ async def display_vehicle_shop(ctx):
                 user_data = data_handler.get_user_data(ctx.author.id)
                 if user_data['coin_balance'] < item['price']:
                     await ctx.send("You do not have enough coins to purchase this vehicle.")
+                elif item['id'] in user_data['vehicles']:
+                    user_data['vehicle'] = item['id']
+                    await ctx.send(f"Equipped {item['name']} as your active vehicle.")
                 else:
                     user_data['coin_balance'] -= item['price']
                     user_data['vehicles'].append(item['id'])
+                    user_data['vehicle'] = item['id']
                     data_handler.save_user_data(ctx.author.id, user_data)
-                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins! It is now your active vehicle.\n-# To switch vehicles, use the shop and click buy on the vehicle (it won't charge you again if you already own it).")
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
         except Exception as e:
             break
 
@@ -336,7 +374,33 @@ async def jobs(ctx):
             break
 
 @client.command()
+async def use(ctx, item_name):
+    user_data = data_handler.get_user_data(ctx.author.id)
+    inventory = user_data['inventory']
+    if len(inventory) == 0:
+        await ctx.send(f"You do not have any items in your inventory, therefore you cannot use {id_to_name[item_name]}.")
+        return
+    if item_name not in inventory:
+        await ctx.send(f"You do not have {id_to_name[item_name]} in your inventory. Maybe you can buy it from the shop?")
+        return
+    # get item type
+    item_type = item_type_from_id[item_name]
+    if item_type == "food":
+        refill = food_hunger_refill[item_name]
+        user_data['hunger'] += refill
+        if user_data['hunger'] > user_data['hunger_max']:
+            user_data['hunger'] = user_data['hunger_max']
+        inventory.remove(item_name, 1)
+        ctx.send(f"You ate a {id_to_name[item_name]} and refilled your hunger by {refill} points. Your hunger bar is now at {user_data['hunger']} points.")
+    else:
+        ctx.send("That item is not usable or does not exist. Perhaps check your spelling?")
+
+@client.command()
 async def help(ctx):
-  await ctx.send(help_output)
+  embed = discord.Embed(
+    title="Sasbot Help",
+    description=help_output,
+  )
+  await ctx.send(embed=embed)
 
 client.run(os.getenv('TOKEN'))
