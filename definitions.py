@@ -1,3 +1,8 @@
+import discord
+
+# Migration utilities for updating user data versions
+current_user_data_version = 2
+
 help_output = """
 This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
 
@@ -97,6 +102,7 @@ special_shop_items = [
 ]
 
 id_to_name = {
+  "": "None",
   "sausage": "Sausage",
   "orange": "Orange",
   "burger": "Burger",
@@ -108,7 +114,8 @@ id_to_name = {
   "bike": "Super Bike",
   "bank": "Bank Account Upgrade",
   "food_meter": "Bigger Food Meter",
-  "shoes": "Shoes Upgrade"
+  "shoes": "Shoes Upgrade",
+  "debug": "Debug Item"
 }
 
 jobs_list = ["campground", "fishing", "taxi", "delivery", "newspaper", "paramedic", "police", "doctor", "ferry", "trash", "mushroom", "port"]
@@ -125,7 +132,8 @@ work_messages = {
   "ferry": ["You drove the ferry and sold some food. These passengers sure to pay a lot to eat!", "Someone paid you good money for some food. You drove them to the island.", "You delivered people to and from the island. They paid you good money for some food."],
   "trash": ["You recycled a lot of trash and sold it.", "You collected trash from the bottom of the ocean and helped save the enviroment!", "You removed trash from the ocean floor and sold it"],
   "mushroom": ["After collecting many mushrooms, you sold it to the mushroom lady.", "What a big haul! You sold many mushrooms to the mushroom lady.", "You sell many mushrooms to the mushroom lady."],
-  "port": ["You steal some coin crates from the port and make big money.", "You steal some burger crates from the port and sell it to the bear.", "You steal some beef jerky crates and sell it to the bear.", "You steal some orange crates and sell it to the Vitamin C Enthusiast."]
+  "port": ["You steal some coin crates from the port and make big money.", "You steal some burger crates from the port and sell it to the bear.", "You steal some beef jerky crates and sell it to the bear.", "You steal some orange crates and sell it to the Vitamin C Enthusiast."],
+  "debugjobid": ["Debug: Gave coins."]
 }
 
 vehicle_modifers = {
@@ -133,19 +141,93 @@ vehicle_modifers = {
   "car": 0.9,
   "sports": 0.8,
   "super": 0.7,
-  "bike": 0.5
+  "bike": 0.5,
+  "debug": 0
 }
 
 food_hunger_refill = {
   "sausage": 1,
   "orange": 2,
   "burger": 5,
-  "spaghetti": 10
+  "spaghetti": 10,
+  "debug": 10000
 }
 
 item_type_from_id = {
   "sausage": "food",
   "orange": "food",
   "burger": "food",
-  "spaghetti": "food"
+  "spaghetti": "food",
+  "golfcart": "vehicle",
+  "car": "vehicle",
+  "sports": "vehicle",
+  "super": "vehicle",
+  "bike": "vehicle",
+  "bank": "upgrade",
+  "food_meter": "upgrade",
+  "shoes": "upgrade",
+  "debug": "debug"
 }
+
+bank_levels = {
+  0: {"price": 500, "capacity": 500, "name": "Tiny Bank Account", "description": "A tiny bank account that can hold up to 500 coins.", "interest": 0},
+  1: {"price": 500, "capacity": 1000, "name": "Small Bank Account", "description": "A small bank account that can hold up to 1000 coins.", "interest": 0},
+  2: {"price": 1000, "capacity": 2000, "name": "Medium Bank Account", "description": "A medium bank account that can hold up to 2000 coins.", "interest": 0},
+  3: {"price": 3500, "capacity": 5000, "name": "Large Bank Account", "description": "A large bank account that can hold up to 5000 coins.", "interest": 0},
+  4: {"price": 9000, "capacity": 10000, "name": "Huge Bank Account", "description": "A huge bank account that can hold up to 10000 coins.", "interest": 0},
+  5: {"price": 20000, "capacity": 25000, "name": "Massive Bank Account", "description": "A massive bank account that can hold up to 25000 coins.", "interest": 0},
+  6: {"price": 50000, "capacity": 50000, "name": "Gigantic Bank Account", "description": "A gigantic bank account that can hold up to 50000 coins. Additionally, gains 1% interest each IRL day at 00:00 PST.", "interest": 0.01},
+  7: {"price": 100000, "capacity": 100000, "name": "Colossal Bank Account", "description": "A colossal bank account that can hold up to 100000 coins. Additionally, gains 2% interest each IRL day at 00:00 PST.", "interest": 0.02},
+  8: {"price": 100000, "capacity": 100000, "name": "Colossal Bank Account", "description": "A colossal bank account that can hold up to 100000 coins. Additionally, gains 3.5% interest each IRL day at 00:00 PST.", "interest": 0.035},
+  9: {"price": 200000, "capacity": 200000, "name": "Mega Bank Account", "description": "A mega bank account that can hold up to 200000 coins. Additionally, gains 5% interest each IRL day at 00:00 PST.", "interest": 0.05},
+  10: {"price": 500000, "capacity": 500000, "name": "Ultra Bank Account", "description": "An ultra bank account that can hold up to 500000 coins. Additionally, gains 10% interest each IRL day at 00:00 PST.", "interest": 0.1},
+  11: {"price": 1000000, "capacity": 1000000, "name": "Elite Only Bank Account", "description": "An elite only bank account that can hold up to 1000000 coins. Additionally, gains 20% interest each IRL day at 00:00 PST.", "interest": 0.2},
+  12: {"price": 1000000, "capacity": 1000000, "name": "Waste of Money", "description": "With this much money, you can afford to waste some... right?", "interest": 0.2},
+  13: {"price": 100000000, "capacity": 100000000000000, "name": "(Almost) Infinite Bank Account", "description": "Welp, you deserve this. If you can somehow make this much money, you'll be all set with this much interest!", "interest": 0.5},
+  14: {"price": 100000000000, "capacity": 10000000000000000000000000000000000, "name": "WHAT", "description": "Well, I guess you deserve this insane interest rate. Good job on making this much money. Doubling your money every day is sure to get out of hand soon...", "interest": 1},
+  15: {"price": 100000000000000000000000000000000000, "capacity": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000, "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "description": "This is all your fault. The capacity number is really really long now, I don't know what more you want. Perhaps with this much money you can 10x your money every day? I don't even know how you managed this much money.", "interest": 9},
+  16: {"price": 1000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000, "name": "Humble Beginnings", "description": "1000x your money every day. Not only that, but your bank is truly infinite now. Maybe it's time to finally take a look at what you've accomplished. `|stats` to check your stats.", "interest": 999}
+}
+
+hunger_levels = {
+  0: {"price": 0, "capacity": 6, "name": "Food Meter", "description": "A food meter that can hold up to 6 hunger points."},
+  1: {"price": 500, "capacity": 7, "name": "Bigger Food Meter", "description": "A food meter that can hold up to 7 hunger points."},
+  2: {"price": 1000, "capacity": 8, "name": "Even Bigger Food Meter", "description": "A food meter that can hold up to 8 hunger points."},
+  3: {"price": 2500, "capacity": 9, "name": "Even Even Food Meter", "description": "A food meter that can hold up to 9 hunger points."},
+  4: {"price": 5000, "capacity": 10, "name": "A Very Big Food Meter", "description": "A food meter that can hold up to 10 hunger points."},
+  5: {"price": 10000, "capacity": 11, "name": "A Very Very Big Food Meter", "description": "A food meter that can hold up to 11 hunger points."},
+  6: {"price": 20000, "capacity": 12, "name": "A Very Very Very Big Food Meter", "description": "A food meter that can hold up to 12 hunger points."},
+  7: {"price": 50000, "capacity": 13, "name": "The Big Food Meter", "description": "A food meter that can hold up to 13 hunger points."},
+  8: {"price": 100000, "capacity": 14, "name": "The Bigger Food Meter", "description": "A food meter that can hold up to 14 hunger points."},
+  9: {"price": 200000, "capacity": 15, "name": "The Biggest Food Meter", "description": "A food meter that can hold up to 15 hunger points."},
+  10: {"price": 500000, "capacity": 16, "name": "Aboslute Maximum Food Meter", "description": "A food meter that can hold up to 16 hunger points."},
+  11: {"price": 1000000, "capacity": 17, "name": "The Food Meter", "description": "A food meter that can hold up to 17 hunger points."},
+  12: {"price": 1000000, "capacity": 18, "name": "Food Meter 18", "description": "A food meter that can hold up to 18 hunger points."},
+  13: {"price": 1000000, "capacity": 19, "name": "Food Meter 19 Plus", "description": "A food meter that can hold up to 19 hunger points."},
+  14: {"price": 1000000, "capacity": 20, "name": "Food Meter 20 Pro", "description": "A food meter that can hold up to 20 hunger points."},
+  15: {"price": 1000000, "capacity": 21, "name": "Food Meter 21 Pro Max", "description": "A food meter that can hold up to 21 hunger points."},
+  16: {"price": 1000000, "capacity": 22, "name": "Food Meter 22 Ultra", "description": "A food meter that can hold up to 22 hunger points."},
+  17: {"price": 1000000, "capacity": 23, "name": "Food Meter 23 Ultra Collector's Edition Fold 5G", "description": "A food meter that can hold up to 23 hunger points."},
+  18: {"price": 1000000, "capacity": 24, "name": "Foooooooooooooooooood Meter", "description": "A food meter that can hold up to 24 hunger points."},
+  19: {"price": 1000000, "capacity": 25, "name": "Fod Mtr", "description": "A food meter that can hold up to 25 hunger points."},
+  20: {"price": 1000000, "capacity": 26, "name": "FMetr.app", "description": "A food meter that can hold up to 26 hunger points."},
+  21: {"price": 1000000, "capacity": 27, "name": "f00d m3t3r", "description": "A food meter that can hold up to 27 hunger points."},
+  22: {"price": 1000000, "capacity": 28, "name": "FOX MISCHIEF", "description": "A food meter that can hold up to 28 hunger points."},
+  23: {"price": 1000000, "capacity": 29, "name": "Why you still buying this", "description": "A food meter that can hold up to 29 hunger points."},
+  24: {"price": 1000000, "capacity": 30, "name": "SACRIFICE", "description": "A food meter that can hold up to 30 hunger points."},
+  25: {"price": 100000000, "capacity": 100, "name": "where you getting this much food?", "description": "A food meter that can hold up to 100 hunger points."},
+  26: {"price": 100000000, "capacity": 200, "name": "how are you still alive", "description": "A food meter that can hold up to 200 hunger points."},
+  27: {"price": 1, "capacity": 201, "name": "for free. really.", "description": "A food meter that can hold up to 201 hunger points."},
+  28: {"price": 100, "capacity": 202, "name": "for free. really.", "description": "A food meter that can hold up to 202 hunger points."},
+  29: {"price": 1000, "capacity": 203, "name": "for free. really.", "description": "A food meter that can hold up to 203 hunger points."},
+  30: {"price": 10000, "capacity": 204, "name": "for free. really.", "description": "A food meter that can hold up to 204 hunger points."},
+  31: {"price": 100000, "capacity": 205, "name": "for free. really.", "description": "A food meter that can hold up to 205 hunger points."},
+  32: {"price": 1000000, "capacity": 206, "name": "mmmmmmmm", "description": "A food meter that can hold up to 206 hunger points."},
+  33: {"price": 69420, "capacity": 207, "name": "that's the sound my microwave makes", "description": "A food meter that can hold up to 207 hunger points."},
+  34: {"price": 2, "capacity": 500, "name": "WHATZAAA???", "description": "A food meter that can hold up to 500 hunger points."},
+  35: {"price": 1000000000000000000000000000, "capacity": 100000000000000000000000000000, "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "description": "This is all your fault. The capacity number is really really long now, I don't know what more you want. Perhaps with this much money you can 10x your money every day? I don't even know how you managed this much money. I'll have you know that you are now the proud owner of a food meter that can hold up to 100000000000000000000000000000 hunger points."}
+}
+
+bot_dm_embed = discord.Embed(
+  title="Thank you for using Sasbot!", description="Sadly, Sasbot is currently in closed beta at the moment. It is only accessible via Huey Den at the moment. Thanks!", color=0x00ff00
+)

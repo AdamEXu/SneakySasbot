@@ -3,22 +3,35 @@ from discord.ext import commands
 import data_handler
 import datetime
 import random
+import time
 from definitions import *
 import os
+import base64
+from cryptography.fernet import Fernet
 
 intents = discord.Intents.all()
 
-client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>'], description="Test", intents=intents, help_command=None)
+client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>', 'ss ', 'Ss ', 'SS '], description="Test", intents=intents, help_command=None)
 
 @client.event
 async def on_ready():
   print(f'We have logged in as {client.user}')
 
+def zero_hunger_message(user_id):
+    user_data = data_handler.get_user_data(user_id)
+    user_data['hunger'] = 2
+    user_data['coin_balance'] = user_data['coin_balance'] // 2
+    data_handler.save_user_data(user_id, user_data)
+    return "You fainted due to lack of food. The raccoon found you and took half of your coins. The raccoon also gave you some cookies to eat. Your hunger bar is now at 2 points."
+
 @client.command()
 async def work(ctx):
+  if ctx.guild is None:
+    await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+    return
   user_id = ctx.author.id
   user_in_json = data_handler.ensure_user_in_json(user_id)
-  if user_in_json:
+  if user_in_json == "added":
     await ctx.reply(welcome_output)
   else:
     user_data = data_handler.get_user_data(user_id)
@@ -45,59 +58,118 @@ async def work(ctx):
         earnings = random.randint(earning_min, earning_max)
         user_data['last_work'] = datetime.datetime.now().timestamp()
         user_data['coin_balance'] += earnings
-        user_data['earnings'] += earnings
+        user_data['stats']['total_coinsearned'] += earnings
+        user_data['stats']['total_works'] += 1
+        user_data['stats']['works'][user_job] += 1
+        user_data['stats']['seconds_worked'] += calc_cooldown
+        user_data['hunger'] -= 1
+        if user_data['hunger'] < 0:
+            reply_answer = zero_hunger_message(user_data['id'])
+            embed = discord.Embed(title="Fainted", color=0xff0000)
+            embed.add_field(name="Hunger", value=f'2 / {user_data["hunger_max"]}')
+            embed.add_field(name="Coins", value=f'{user_data["coin_balance"]}')
+            embed.set_footer(text="Make sure to eat something using `|use [food]` to prevent this from happening again! Stock up on food by using `|shop food`.")
+            await ctx.reply(reply_answer, embed=embed)
+            return
         data_handler.save_user_data(user_id, user_data)
         random_work_messages = work_messages[user_data['work_job']]
         random_work_message = random.choice(random_work_messages)
-        user_data['hunger'] -= 1
         work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again in {calc_cooldown} seconds.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
         embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
         await ctx.reply(embed=embed)
 
 @client.command()
-async def bal(ctx):
-  user_id = ctx.author.id
-  user_in_json = data_handler.ensure_user_in_json(user_id)
-  if user_in_json:
-    await ctx.reply(welcome_output)
-  else:
-    user_data = data_handler.get_user_data(user_id)
-    balance = user_data['coin_balance']
-    bank_balance = user_data['bank_balance']
-    bank_lvl = user_data['bank_lvl']
-    user_publicname = ctx.author.display_name
-    if bank_lvl == 0:
-      bank_info = f"""**Bank**
-      You haven't unlocked the bank yet. See the `|shop` for more information."""
+async def bal(ctx, user: discord.Member = None, *args):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    if user is None:
+        user = ctx.author
+
+    user_id = user.id
+    user_in_json = (data_handler.ensure_user_in_json(user_id) == "added")
+
+    if user_in_json:
+        if user == ctx.author:
+            await ctx.reply(welcome_output)
+        else:
+            await ctx.reply("This user hasn't used the bot yet. Perhaps ask them to run a command?")
     else:
-      bank_info = f"""**Bank**
-      Bank Balance: {bank_balance}
-      Bank Level: {bank_lvl}"""
-    embed = discord.Embed(title=f"{user_publicname}'s Balance", description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", color=0x00ff00)
-  embed.add_field(name="Total Earnings (Lifetime)", value=user_data['earnings'])
-  embed.add_field(name="Hunger Bar", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
-  await ctx.reply(embed=embed)
+        user_data = data_handler.get_user_data(user_id)
+        balance = user_data['coin_balance']
+        bank_balance = user_data['bank_balance']
+        bank_lvl = user_data['bank_lvl']
+        user_publicname = user.display_name
+
+        if user != ctx.author:
+            bank_info = ""
+        elif bank_lvl == 0:
+            bank_info = f"""**Bank**
+            You haven't unlocked the bank yet. See the `|shop` for more information."""
+        else:
+            bank_info = f"""**Bank**
+            Bank Balance: {bank_balance}
+            Bank Level: {bank_lvl}"""
+
+        embed = discord.Embed(title=f"{user_publicname}'s Balance", 
+                              description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", 
+                              color=0x00ff00)
+        embed.add_field(name="Total Earnings (Lifetime)", value=user_data['stats']['total_coinsearned'])
+        embed.add_field(name="Hunger Bar", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
+        await ctx.reply(embed=embed)
 
 @client.command()
-async def inv(ctx):
+async def inv(ctx, user: discord.Member = None):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    if user is None:
+        user = ctx.author
+
+    user_id = user.id
+    user_in_json = data_handler.ensure_user_in_json(user_id)
+    if user_in_json == "added":
+        if user == ctx.author:
+            await ctx.reply(welcome_output)
+        else:
+            await ctx.reply(f"{user.display_name} hasn't used the bot yet.")
+        return
+    elif user_in_json == "corrupted":
+        await ctx.reply("# ERROR: Your user data is corrupted. Please contact the bot owner.\nThis is a fatal error and you have lost all of your data. Please DM <@1272666435063251057> **AS SOON AS POSSIBLE** for the possibility of restoring your data. This should hopefully never happen again. Thank you for your understanding.")
+
+    user_data = data_handler.get_user_data(user_id)
+    inventory_list = "\n".join(f"* {id_to_name[item]}" for item in user_data['inventory'])
+
+    embed = discord.Embed(
+        title=f"{user.display_name}'s Inventory",
+        description=f"Hunger Bar: {user_data['hunger']} / {user_data['hunger_max']}",
+        color=0x00ff00
+    )
+    embed.add_field(name="Food Items", value=inventory_list or "No items")
+    
+    if user == ctx.author:
+        vehicle_list = "\n".join(f"* {id_to_name[vehicle]}" for vehicle in user_data['vehicles'])
+        embed.add_field(name="Vehicles", value=vehicle_list or "No vehicles")
+    
+    embed.add_field(name="Current Vehicle", value=id_to_name.get(user_data['vehicle'], "None"))
+
+    await ctx.reply(embed=embed)
+
+@client.command()
+async def dep(ctx, amount: int):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
     user_id = ctx.author.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json:
         await ctx.reply(welcome_output)
     else:
         user_data = data_handler.get_user_data(user_id)
-        inventory = user_data['inventory']
-        inventory_list = ""
-        for item in inventory:
-            inventory_list += f"* {id_to_name[item]}\n"
-        vehicle_list = ""
-        for vehicle in user_data['vehicles']:
-            vehicle_list += f"* {id_to_name[vehicle]}\n"
-        embed = discord.Embed(title=f"{ctx.author.display_name}'s Inventory", description=f"Hunger Bar: {user_data['hunger']} / {user_data['hunger_max']}", color=0x00ff00)
-        embed.add_field(name="Food Items", value=inventory_list)
-        embed.add_field(name="Vehicles", value=vehicle_list)
-        embed.add_field(name="Current Vehicle", value=id_to_name[user_data['vehicle']])
-        await ctx.reply(embed=embed)
+        if amount > user_data['coin_balance']:
+            await ctx.reply("You do not have enough coins to deposit.")
+        elif amount <= 0:
+            await ctx.reply("You must deposit some coins. If you want to withdraw, use `|with`.")
 
 def create_shop_embed(index, shop, shop_name):
     item = shop[index]
@@ -112,6 +184,14 @@ def create_shop_embed(index, shop, shop_name):
 
 @client.command()
 async def shop(ctx, shop_name=None):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    print("shopping for", shop_name)
+    # if dm, send error message
+    if ctx.guild is None:
+        await ctx.send("`|shop` is currently broken in DMs. Please use it in a server.")
+        return
     if shop_name:
         if shop_name.lower() == "food" or shop_name.lower() == "foods":
             await display_food_shop(ctx)
@@ -255,11 +335,14 @@ async def display_vehicle_shop(ctx):
                 item = vehicle_shop_items[current_index]
                 await message.remove_reaction(reaction, user)
                 user_data = data_handler.get_user_data(ctx.author.id)
-                if user_data['coin_balance'] < item['price']:
-                    await ctx.send("You do not have enough coins to purchase this vehicle.")
+                if user_data['vehicle'] == item['id']:
+                    await ctx.send(f"You already own and equipped {item['name']} as your active vehicle.")
                 elif item['id'] in user_data['vehicles']:
                     user_data['vehicle'] = item['id']
+                    data_handler.save_user_data(ctx.author.id, user_data)
                     await ctx.send(f"Equipped {item['name']} as your active vehicle.")
+                elif user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this vehicle.")
                 else:
                     user_data['coin_balance'] -= item['price']
                     user_data['vehicles'].append(item['id'])
@@ -332,6 +415,9 @@ def create_job_embed(index):
 
 @client.command()
 async def jobs(ctx):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
     current_index = 0
     message = await ctx.send(embed=create_job_embed(current_index))
 
@@ -375,6 +461,9 @@ async def jobs(ctx):
 
 @client.command()
 async def use(ctx, item_name):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
     user_data = data_handler.get_user_data(ctx.author.id)
     inventory = user_data['inventory']
     if len(inventory) == 0:
@@ -385,22 +474,129 @@ async def use(ctx, item_name):
         return
     # get item type
     item_type = item_type_from_id[item_name]
-    if item_type == "food":
+    if item_type == "food" or item_type == "debug":
         refill = food_hunger_refill[item_name]
         user_data['hunger'] += refill
         if user_data['hunger'] > user_data['hunger_max']:
             user_data['hunger'] = user_data['hunger_max']
-        inventory.remove(item_name, 1)
-        ctx.send(f"You ate a {id_to_name[item_name]} and refilled your hunger by {refill} points. Your hunger bar is now at {user_data['hunger']} points.")
+        inventory.remove(item_name)
+        embed = discord.Embed(title="Tasty!", color=0x00ff00)
+        embed.add_field(name="Hunger", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
+        embed.add_field(name="Food Consumed", value=id_to_name[item_name])
+        data_handler.save_user_data(ctx.author.id, user_data)
+        await ctx.send(f"You ate a {id_to_name[item_name]} and refilled your hunger by {refill} points. Your hunger bar is now at {user_data['hunger']} points.", embed=embed)
     else:
-        ctx.send("That item is not usable or does not exist. Perhaps check your spelling?")
+        await ctx.send("That item is not usable or does not exist. Perhaps check your spelling?")
+
+@client.command()
+async def eat(ctx, item_name):
+    await use(ctx, item_name)
 
 @client.command()
 async def help(ctx):
-  embed = discord.Embed(
-    title="Sasbot Help",
-    description=help_output,
-  )
-  await ctx.send(embed=embed)
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    embed = discord.Embed(
+        title="Sasbot Help",
+        description=help_output,
+    )
+    await ctx.send(embed=embed)
+
+@client.event
+async def on_command_error(ctx, error):
+    # Create a base embed for error messages
+    embed = discord.Embed(title="Error", color=discord.Color.red())
+
+    if isinstance(error, commands.CommandNotFound):
+        embed.description = f"The command `{ctx.invoked_with}` does not exist. Please check the command and try again."
+    
+    elif isinstance(error, commands.MemberNotFound):
+        embed.description = f"The member `{error.argument}` could not be found. Please ensure the username or mention is correct."
+    
+    elif isinstance(error, commands.MissingRequiredArgument):
+        embed.description = f"You're missing a required argument: `{error.param.name}`. Please provide it and try again."
+    
+    elif isinstance(error, commands.BadArgument):
+        embed.description = f"You provided an invalid argument for the command `{ctx.command}`. Please check your input and try again."
+    
+    elif isinstance(error, commands.MissingPermissions):
+        embed.description = f"You don't have the necessary permissions to run the command `{ctx.command}`."
+    
+    elif isinstance(error, commands.BotMissingPermissions):
+        embed.description = f"I don't have the necessary permissions to execute the command `{ctx.command}`. Please check my permissions and try again."
+    
+    elif isinstance(error, commands.NotOwner):
+        embed.description = "This command can only be used by the bot owner."
+    
+    elif isinstance(error, commands.CommandOnCooldown):
+        embed.description = f"The command `{ctx.command}` is on cooldown. Please try again after {error.retry_after:.2f} seconds."
+    
+    elif isinstance(error, commands.CheckFailure):
+        embed.description = f"You do not meet the requirements to use the command `{ctx.command}`."
+    
+    else:
+        embed.description = f"An unexpected error occurred while processing the command `{ctx.command}`."
+        raise error  # Re-raise the error for further logging or debugging if needed
+
+    # Send the embed with the error message
+    await ctx.reply(embed=embed)
+
+@client.command()
+async def reset(ctx):
+    message = await ctx.reply("**DANGER ZONE**\nThis command will reset all of your data. Are you sure you want to proceed?")
+    await message.add_reaction('✅')
+    await message.add_reaction('❌')
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['✅', '❌']
+    try:
+        reaction, user = await client.wait_for('reaction_add', timeout=15.0, check=check)
+        if str(reaction.emoji) == '✅':
+            message = await ctx.reply("Are you absolutely sure you want to reset all of your data? This action is irreversible. You will lose all of your coins, items, and progress. The data cannot be recovered under any circumstances. If you proceed, you will be starting from scratch and forfeit any current progress. Additionally, you will lose any special ranks, items, or perks you may have obtained. This includes Early Tester role, bank levels and contents, and any other special roles or items. Are you sure you want to proceed?")
+            await message.add_reaction('✅')
+            await message.add_reaction('❌')
+            def check(reaction, user):
+                return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['✅', '❌']
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=15.0, check=check)
+                if str(reaction.emoji) == '✅':
+                    user_data = data_handler.get_user_data(ctx.author.id)
+                    print(user_data)
+                    user_data_base64 = base64.b64encode(str(user_data).encode('utf-8')).decode('utf-8')
+                    secret_key = os.getenv('SECRET_KEY')
+                    secret_key = secret_key.encode('utf-8')
+                    print(secret_key)
+                    f = Fernet(secret_key)
+                    encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
+                    print(encrypted_user_data)
+                    data_handler.drop_user(ctx.author.id)
+                    embed = discord.Embed(title="Data Reset", description="Your data has been permanently deleted. It cannot be restored at all whatsoever.", color=0xff0000)
+                    await ctx.send("Your data has been reset. You are now starting from scratch.", embed=embed)
+                else:
+                    await ctx.send("Reset cancelled.")
+            except Exception as e:
+                print(e)
+                await ctx.send("Reset cancelled.")
+        else:
+            await ctx.send("Reset cancelled.")
+    except Exception as e:
+        await ctx.send("Reset cancelled.")
+
+@client.command()
+async def debug(ctx):
+    if ctx.guild is None:
+        await ctx.send(f"Nice try. Your User ID is clearly {ctx.author.id} which does not match my owner's. Please never try this command again.", embed=bot_dm_embed)
+        return
+    elif ctx.author.id == 773996537414942763:
+        await ctx.send("Debug embed modal sent to DM.")
+        await ctx.author.send("Pong!")
+        time.sleep(6)
+        embed = discord.Embed(title="Controller_COINS", description="Added 1000 coins to <@773996537414942763>. Pong!", color=0x00ff00)
+        await ctx.send(embed=embed)
+        time.sleep(2)
+        await ctx.send("Ended debug session with owner. Debug embed deleted.")
+    else:
+        embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
+        await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
 
 client.run(os.getenv('TOKEN'))

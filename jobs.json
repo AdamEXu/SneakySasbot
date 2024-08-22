@@ -6,7 +6,7 @@
     "cooldown": 30,
     "earning_max": 30,
     "earning_min": 20,
-    "cost": 0
+    "cost": 30
   },
   {
     "id": "fishing",
@@ -106,5 +106,14 @@
     "earning_max": 5000,
     "earning_min": 3000,
     "cost": 10000
+  },
+  {
+    "id": "debugjobid",
+    "name": "Debug Job",
+    "description": "Debug Job",
+    "cooldown": 0,
+    "earning_max": 1000000000,
+    "earning_min": 1000000000,
+    "cost": 0
   }
 ]
