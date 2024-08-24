@@ -48,6 +48,10 @@ def ensure_user_in_json(user_id):
         "food_eaten": 0,
         "food_bought": 0
       },
+      "settings": {
+        "auto_buy": False,
+        "detect_bad_words": False
+      },
       "date_joined": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
     with open('data.json', 'w') as f:
@@ -119,6 +123,13 @@ def ensure_user_in_json(user_id):
             }
             print(user)
             print("User stats migrated")
+          if 'settings' not in user:
+            print("Migrating user settings")
+            user['settings'] = {
+              "auto_buy": False,
+              "detect_bad_words": False
+            }
+            print("User settings migrated to default values")
           if 'earnings' in user:
             user['stats']['total_coinsearned'] = user['earnings']
             del user['earnings']

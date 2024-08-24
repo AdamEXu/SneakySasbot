@@ -156,20 +156,116 @@ async def inv(ctx, user: discord.Member = None):
     await ctx.reply(embed=embed)
 
 @client.command()
-async def dep(ctx, amount: int):
+async def dep(ctx, amount):
     if ctx.guild is None:
         await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
         return
     user_id = ctx.author.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
-    if user_in_json:
+    if user_in_json == "added":
         await ctx.reply(welcome_output)
     else:
         user_data = data_handler.get_user_data(user_id)
-        if amount > user_data['coin_balance']:
-            await ctx.reply("You do not have enough coins to deposit.")
-        elif amount <= 0:
-            await ctx.reply("You must deposit some coins. If you want to withdraw, use `|with`.")
+        if user_data['bank_lvl'] == 0:
+            await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+            return
+        if amount.lower() == "all":
+            amount = user_data['coin_balance']
+            if amount == 0:
+                await ctx.reply("You do not have any coins to deposit.")
+                return
+            if amount > bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']:
+                amount = bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']
+                if amount == 0:
+                    await ctx.reply("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
+                    return
+                else:
+                    user_data['coin_balance'] -= amount
+                    user_data['bank_balance'] += amount
+                    data_handler.save_user_data(user_id, user_data)
+                    await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+                    return
+            else:
+                user_data['coin_balance'] -= amount
+                user_data['bank_balance'] += amount
+                data_handler.save_user_data(user_id, user_data)
+                await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+                return
+        else:
+            if not amount.isdigit():
+                await ctx.reply("Please enter a valid number to deposit.")
+                return
+            amount = int(amount)
+            if user_data['bank_lvl'] == 0:
+                await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+                return
+            if amount <= 0:
+                await ctx.reply("Please enter a valid number to deposit.")
+                return
+            if amount > user_data['coin_balance']:
+                await ctx.reply("You do not have enough coins to deposit.")
+                return
+            if amount > bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']:
+                amount = bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']
+                if amount == 0:
+                    await ctx.reply("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
+                    return
+                else:
+                    await ctx.reply(f"There is not enough space in your bank to deposit {amount} coins.")
+                    return
+            user_data['coin_balance'] -= amount
+            user_data['bank_balance'] += amount
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
+
+@client.command()
+async def withdraw(ctx, amount):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    user_id = ctx.author.id
+    user_in_json = data_handler.ensure_user_in_json(user_id)
+    if user_in_json == "added":
+        await ctx.reply(welcome_output)
+    else:
+        user_data = data_handler.get_user_data(user_id)
+        if user_data['bank_lvl'] == 0:
+            await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+            return
+        if amount.lower() == "all":
+            amount = user_data['bank_balance']
+            if amount == 0:
+                await ctx.reply("You do not have any coins to withdraw.")
+                return
+            user_data['coin_balance'] += amount
+            user_data['bank_balance'] = 0
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.reply(f"Withdrew {amount} coins from your bank. Your bank balance is now 0 / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
+        else:
+            if not amount.isdigit():
+                await ctx.reply("Please enter a valid number to withdraw.")
+                return
+            amount = int(amount)
+            if amount <= 0:
+                await ctx.reply("Please enter a valid number to withdraw.")
+                return
+            if user_data['bank_lvl'] == 0:
+                await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+                return
+            if amount > user_data['bank_balance']:
+                await ctx.reply("You do not have enough coins to withdraw.")
+                return
+            user_data['coin_balance'] += amount
+            user_data['bank_balance'] -= amount
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.reply(f"Withdrew {amount} coins from your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
+
+@client.command(name='with')
+async def withdraw_command(ctx, amount):
+    await withdraw(ctx, amount)
 
 def create_shop_embed(index, shop, shop_name):
     item = shop[index]
@@ -398,8 +494,17 @@ def upgrade_shop_embed(user_id, shop_name, user_data):
             description="Every time you work, your food meter goes down by 1 point. If it reaches 0, you will faint and lose half of your coins and half of your inventory. Upgrade your food meter to increase its capacity and ensure you don't run out of food.",
             color=0x00ff00
         )
-        embed.add_field(name="Current Level", value=f"**Capacity**: {user_data['hunger']} / {user_data['hunger_max']} points")
-        embed.add_field(name="Next Level", value="Coming soon!")
+        user_maxhunger = user_data['hunger_max']
+        hunger_level = user_maxhunger - 6
+        current_hunger_info = hunger_levels[hunger_level]
+        if hunger_level == len(hunger_levels) - 1:
+            embed.add_field(name="Current Level", value=f"{current_hunger_info['description']}\n**Capacity**: {user_data['hunger']} / {user_maxhunger} points")
+            embed.add_field(name="Next Level", value="You have reached the maximum food meter level. Check back later to see if more levels have been added.")
+            embed.set_footer(text="Page 2 of 3")
+            return embed
+        next_hunger_info = hunger_levels[hunger_level + 1]
+        embed.add_field(name="Current Level", value=f"{current_hunger_info['description']}\n**Capacity**: {user_data['hunger']} / {user_maxhunger} points")
+        embed.add_field(name="Next Level", value=f"{next_hunger_info['description']}\n**Capacity**: {next_hunger_info['capacity']} points\n**Upgrade Cost**: {next_hunger_info['price']} coins")
         embed.set_footer(text="Page 2 of 3")
         return embed
     elif shop_name == "shoes":
@@ -454,7 +559,24 @@ async def display_special_shop(ctx):
                             data_handler.save_user_data(ctx.author.id, user_data)
                             await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
                             await ctx.send(f"You have upgraded your bank to level {bank_lvl + 1}!")
+                elif upgrades[current_index] == "foodmeter":
+                    user_data = data_handler.get_user_data(ctx.author.id)
+                    user_maxhunger = user_data['hunger_max']
+                    hunger_level = user_maxhunger - 6
+                    if hunger_level == len(hunger_levels) - 1:
+                        await ctx.send("You already have the maximum food meter level. Check back later to see if more levels have been added.")
+                    else:
+                        next_hunger_info = hunger_levels[hunger_level + 1]
+                        if user_data['coin_balance'] < next_hunger_info['price']:
+                            await ctx.send("You do not have enough coins to upgrade your food meter. Keep working to earn more coins!")
+                        else:
+                            user_data['coin_balance'] -= next_hunger_info['price']
+                            user_data['hunger_max'] += 1
+                            data_handler.save_user_data(ctx.author.id, user_data)
+                            await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                            await ctx.send(f"You have upgraded your food meter to level {hunger_level + 1}! Food not included. Buy food from the shop to fill that expanded hunger meter! Your current hunger bar: {user_data['hunger']} / {user_data['hunger_max']}")
         except Exception as e:
+            print(e)
             break
 
 def create_job_embed(index):
@@ -549,6 +671,33 @@ async def use(ctx, item_name):
 @client.command()
 async def eat(ctx, item_name):
     await use(ctx, item_name)
+
+quick_shop_items = {
+    "sausage": 10,
+    "orange": 20,
+    "burger": 50,
+    "spaghetti": 100,
+}
+
+@client.command()
+async def buy(ctx, item_name, amount=1):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    user_data = data_handler.get_user_data(ctx.author.id)
+    if item_name in quick_shop_items:
+        price = quick_shop_items[item_name]
+    else:
+        await ctx.send("That item does not exist in the quick shop. Please use the regular shop to buy that.")
+        return
+    if user_data['coin_balance'] < price * amount:
+        await ctx.send(f"You do not have enough coins to buy that item. It costs {price * amount} coins.")
+        return
+    user_data['coin_balance'] -= price * amount
+    for _ in range(amount):
+        user_data['inventory'].append(item_name)
+    data_handler.save_user_data(ctx.author.id, user_data)
+    await ctx.send(f"You have purchased {amount} {id_to_name[item_name]} for {price * amount} coins!")
 
 @client.command()
 async def help(ctx, command=None):
@@ -669,5 +818,55 @@ async def debug(ctx):
     else:
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
+
+badwords = []
+
+@client.event
+async def on_message(ctx):
+    if ctx.author.bot:
+        return
+    if ctx.guild is None:
+        if ctx.author.id == 773996537414942763:
+            await ctx.reply(f"Pong! Response time: {round(client.latency * 1000)}ms")
+        await ctx.reply("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    user_data = data_handler.get_user_data(ctx.author.id)
+    if user_data['settings']['detect_bad_words'] == True:
+        for badword in badwords:
+            if badword in ctx.content.lower():
+                await ctx.reply("Bad word detected.")
+                return
+    await client.process_commands(ctx)        
+
+@client.command()
+async def sell(ctx, item_name, amount=1):
+    if ctx.guild is None:
+        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    user_data = data_handler.get_user_data(ctx.author.id)
+    if item_name == 'all':
+        total_price = 0
+        print(user_data['inventory'])
+        for i in range(len(user_data['inventory'])):
+            print(f"selling {user_data['inventory'][i]} for {quick_shop_items[user_data['inventory'][i]]//2}")
+            price = quick_shop_items[user_data['inventory'][i]]//2
+            total_price += price
+        user_data['coin_balance'] += total_price
+        user_data['inventory'] = []
+        data_handler.save_user_data(ctx.author.id, user_data)
+        await ctx.send(f"You have sold all of your items for {total_price} coins!")
+        return
+    if item_name not in user_data['inventory']:
+        await ctx.send(f"You do not have {id_to_name[item_name]} in your inventory.")
+        return
+    if amount > user_data['inventory'].count(item_name):
+        await ctx.send(f"You do not have {amount} {id_to_name[item_name]} in your inventory.")
+        return
+    price = quick_shop_items[item_name]//2
+    user_data['coin_balance'] += price * amount
+    for _ in range(amount):
+        user_data['inventory'].remove(item_name)
+    data_handler.save_user_data(ctx.author.id, user_data)
+    await ctx.send(f"You have sold {amount} {id_to_name[item_name]} for {price * amount} coins!")
 
 client.run(os.getenv('TOKEN'))
