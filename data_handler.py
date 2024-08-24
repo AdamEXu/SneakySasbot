@@ -62,6 +62,8 @@ def ensure_user_in_json(user_id):
           # ensure user data version is up to date
           if 'data_version' not in user:
             user['data_version'] = current_user_data_version
+          if 'coin_balance' not in user:
+            user['coin_balance'] = 0
           if 'bank_balance' not in user:
             user['bank_balance'] = 0
           if 'bank_lvl' not in user:
@@ -122,7 +124,6 @@ def ensure_user_in_json(user_id):
             del user['earnings']
           if 'coin_balance' in user and 'stats' in user and 'total_coinsearned' in user['stats'] and user['coin_balance'] > 0 and user['stats']['total_coinsearned'] == 0:
             user['stats']['total_coinsearned'] += user['coin_balance']
-            del user['coin_balance']
           if user['data_version'] < current_user_data_version:
             print("Migrating user data")
             fields = ['coin_balance', 'work_job', 'last_work', 'vehicles', 'vehicle', 'inventory', 'hunger', 'hunger_max', 'bank_balance', 'bank_lvl', 'earnings', 'shoe_lvl', 'early_tester', 'stats', 'date_joined']

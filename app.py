@@ -195,10 +195,16 @@ async def shop(ctx, shop_name=None):
     if shop_name:
         if shop_name.lower() == "food" or shop_name.lower() == "foods":
             await display_food_shop(ctx)
+            return
         elif shop_name.lower() == "vehicle" or shop_name.lower() == "vehicles" or shop_name.lower() == "car" or shop_name.lower() == "cars":
             await display_vehicle_shop(ctx)
-        elif shop_name.lower() == "special" or shop_name.lower() == "specials":
+            return
+        elif shop_name.lower() == "special" or shop_name.lower() == "specials" or shop_name.lower() == "upgrades" or shop_name.lower() == "upgrade":
             await display_special_shop(ctx)
+            return
+        else:
+            await ctx.send("Invalid shop name. Please use `|shop` to select a shop.")
+            return
     embed = discord.Embed(
         title="Select a Shop",
         description="Please select a shop by clicking on one of the reactions below:\n\n"
@@ -353,11 +359,61 @@ async def display_vehicle_shop(ctx):
         except Exception as e:
             break
 
+upgrades = ["bank", "foodmeter", "shoes"]
+def upgrade_shop_embed(user_id, shop_name, user_data):
+    if shop_name == "bank":
+        # get current bank level
+        bank_lvl = user_data['bank_lvl']
+        # get information about the current and next bank level
+        current_bank_info = bank_levels[bank_lvl]
+        if bank_lvl == len(bank_levels) - 1:
+            embed = discord.Embed(
+                title="Bank Account",
+                description=f"The bank allows you to store coins safely and prevent them from being stolen. If you pass out from hunger, your bank balance will not be affected. If someone uses `|steal` on you, your bank balance is protected. Upgrade your bank to increase its capacity.",
+                color=0x00ff00
+            )
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins")
+            embed.add_field(name="Next Level", value="You have reached the maximum bank level. Check back later to see if more levels have been added.")
+            embed.set_footer(text="Page 1 of 3")
+            return embed
+        next_bank_info = bank_levels[bank_lvl + 1]
+        embed = discord.Embed(
+            title="Bank Account",
+            description=f"The bank allows you to store coins safely and prevent them from being stolen. If you pass out from hunger, your bank balance will not be affected. If someone uses `|steal` on you, your bank balance is protected. Upgrade your bank to increase its capacity.",
+            color=0x00ff00
+        )
+        if current_bank_info['interest'] > 0:
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins\n**Interest**: {current_bank_info['interest']}% per day")
+        else:
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins")
+        if next_bank_info['interest'] > 0:
+            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins\n**Interest**: {next_bank_info['interest']}% per day")
+        else:
+            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins")
+        embed.set_footer(text="Page 1 of 3")
+        return embed
+    elif shop_name == "foodmeter":
+        embed = discord.Embed(
+            title="Food Meter",
+            description="Every time you work, your food meter goes down by 1 point. If it reaches 0, you will faint and lose half of your coins and half of your inventory. Upgrade your food meter to increase its capacity and ensure you don't run out of food.",
+            color=0x00ff00
+        )
+        embed.add_field(name="Current Level", value=f"**Capacity**: {user_data['hunger']} / {user_data['hunger_max']} points")
+        embed.add_field(name="Next Level", value="Coming soon!")
+        embed.set_footer(text="Page 2 of 3")
+        return embed
+    elif shop_name == "shoes":
+        embed = discord.Embed(
+            title="Coming soon...",
+            description="Coming soon!",
+            color=0x00ff00
+        )
+        embed.set_footer(text="Page 3 of 3")
+        return embed
+
 async def display_special_shop(ctx):
-    await ctx.send("Special Shop coming soon!")
-    return
     current_index = 0
-    message = await ctx.send(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+    message = await ctx.send(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
 
     await message.add_reaction('⬅️')
     await message.add_reaction('💰')
@@ -372,30 +428,32 @@ async def display_special_shop(ctx):
 
             if str(reaction.emoji) == '⬅️':
                 current_index = (current_index - 1) % len(special_shop_items)
-                await message.edit(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+                await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
                 await message.remove_reaction(reaction, user)
 
             elif str(reaction.emoji) == '➡️':
                 current_index = (current_index + 1) % len(special_shop_items)
-                await message.edit(embed=create_shop_embed(current_index, special_shop_items, "Special Shop"))
+                await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
                 await message.remove_reaction(reaction, user)
 
             elif str(reaction.emoji) == '💰':
-                item = special_shop_items[current_index]
                 await message.remove_reaction(reaction, user)
-                user_data = data_handler.get_user_data(ctx.author.id)
-                if item['upgradeable'] and item['id'] in user_data['upgrades']:
-                    await ctx.send(f"You already own and upgraded {item['name']}.")
-                elif user_data['coin_balance'] < item['price']:
-                    await ctx.send("You do not have enough coins to purchase this item.")
-                else:
-                    user_data['coin_balance'] -= item['price']
-                    if item['upgradeable']:
-                        user_data['upgrades'].append(item['id'])
+                if upgrades[current_index] == "bank":
+                    user_data = data_handler.get_user_data(ctx.author.id)
+                    bank_lvl = user_data['bank_lvl']
+                    if bank_lvl == len(bank_levels) - 1:
+                        await ctx.send("You already have the maximum bank level. Check back later to see if more levels have been added.")
                     else:
-                        user_data['inventory'].append(item['id'])
-                    data_handler.save_user_data(ctx.author.id, user_data)
-                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+                        next_bank_info = bank_levels[bank_lvl + 1]
+                        if user_data['coin_balance'] < next_bank_info['price']:
+                            await ctx.send("You do not have enough coins to upgrade your bank. Keep working to earn more coins!")
+                        else:
+                            user_data['coin_balance'] -= next_bank_info['price']
+                            user_data['bank_lvl'] += 1
+                            user_data['bank_balance'] = 0
+                            data_handler.save_user_data(ctx.author.id, user_data)
+                            await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                            await ctx.send(f"You have upgraded your bank to level {bank_lvl + 1}!")
         except Exception as e:
             break
 
@@ -493,9 +551,21 @@ async def eat(ctx, item_name):
     await use(ctx, item_name)
 
 @client.command()
-async def help(ctx):
+async def help(ctx, command=None):
     if ctx.guild is None:
         await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
+        return
+    if command:
+        command = command.lower()
+        if command in command_help:
+            embed = discord.Embed(
+                title=f"Help - {command}",
+                description=command_help[command],
+                color=0x00ff00
+            )
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("That command does not exist. Please check the command and try again.")
         return
     embed = discord.Embed(
         title="Sasbot Help",
@@ -570,7 +640,8 @@ async def reset(ctx):
                     encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
                     print(encrypted_user_data)
                     data_handler.drop_user(ctx.author.id)
-                    embed = discord.Embed(title="Data Reset", description="Your data has been permanently deleted. It cannot be restored at all whatsoever.", color=0xff0000)
+                    embed = discord.Embed(title="Data Reset", description=f"Your data has been deleted from our servers completely. Thank you for using Sasbot and we hope you return! If you already regret losing this data, your recovery phrase is below.", color=0xff0000)
+                    embed.set_footer(text=f"Recovery Phrase: {encrypted_user_data}")
                     await ctx.send("Your data has been reset. You are now starting from scratch.", embed=embed)
                 else:
                     await ctx.send("Reset cancelled.")
