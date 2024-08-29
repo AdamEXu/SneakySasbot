@@ -1,3 +1,5 @@
+Seems the showcase thingy isn't rendering the video. Link here: [https://youtu.be/1ddSpO224dQ](https://youtu.be/1ddSpO224dQ)
+
 # Sneaky SasBot
 A Discord bot with a simple economy system and a few other fun commands.
 
