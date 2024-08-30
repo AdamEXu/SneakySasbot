@@ -696,9 +696,9 @@ async def use(ctx, item_name):
         user_data['hunger'] += refill
         if user_data['hunger'] > user_data['hunger_max']:
             user_data['hunger'] = user_data['hunger_max']
-        inventory["inventory"][item_name] -= 1
-        if inventory["inventory"][item_name] == 0:
-            del inventory["inventory"][item_name]
+        user_data["inventory"][item_name] -= 1
+        if user_data["inventory"][item_name] == 0:
+            del user_data["inventory"][item_name]
         embed = discord.Embed(title="Tasty!", color=0x00ff00)
         embed.add_field(name="Hunger", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
         embed.add_field(name="Food Consumed", value=id_to_name[item_name])
@@ -725,8 +725,10 @@ async def buy(ctx, item_name, amount=1):
         await ctx.send(f"You do not have enough coins to buy that item. It costs {price * amount} coins.")
         return
     user_data['coin_balance'] -= price * amount
-    for _ in range(amount):
-        user_data['inventory'].append(item_name)
+    if item_name in user_data['inventory']:
+        user_data['inventory'][item_name] += amount
+    else:
+        user_data['inventory'][item_name] = amount
     data_handler.save_user_data(ctx.author.id, user_data)
     await ctx.send(f"You have purchased {amount} {id_to_name[item_name]} for {price * amount} coins!")
 
