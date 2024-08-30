@@ -1,21 +1,20 @@
+import asyncio
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import data_handler
 import datetime
+import pytz
 import random
 import time
 from definitions import *
 import os
 import base64
 from cryptography.fernet import Fernet
+import ast
 
 intents = discord.Intents.all()
 
 client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>', 'ss ', 'Ss ', 'SS '], description="Test", intents=intents, help_command=None)
-
-@client.event
-async def on_ready():
-  print(f'We have logged in as {client.user}')
 
 def zero_hunger_message(user_id):
     user_data = data_handler.get_user_data(user_id)
@@ -26,15 +25,16 @@ def zero_hunger_message(user_id):
 
 @client.command()
 async def work(ctx):
-  if ctx.guild is None:
-    await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-    return
   user_id = ctx.author.id
   user_in_json = data_handler.ensure_user_in_json(user_id)
   if user_in_json == "added":
     await ctx.reply(welcome_output)
   else:
     user_data = data_handler.get_user_data(user_id)
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
+        user_data = data_handler.get_user_data(user_id)
+        user = await client.fetch_user(user_id)
     user_job = user_data['work_job']
     last_work = user_data['last_work']
     job_data = data_handler.get_job_data(user_job)
@@ -48,11 +48,17 @@ async def work(ctx):
     if vehicle_modifer < 1:
         rounded_modifer = round((1 - vehicle_modifer) * 100)
         boost_message = f"Your {id_to_name[user_vehicle]} is boosting your cooldown by {rounded_modifer}%!"
+    # time_stamp = f"<t:{round(datetime.datetime.now() + calc_cooldown)}:R>"
+    # time until next work
     if last_work + calc_cooldown > datetime.datetime.now().timestamp():
-        seconds = round(last_work + calc_cooldown - datetime.datetime.now().timestamp())
-        embed = discord.Embed(title="Work", description=f"You can work again in {seconds} seconds.\n{boost_message}", color=0xff0000)
+        time_stamp = datetime.datetime.fromtimestamp(last_work + calc_cooldown)
+        time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
+        embed = discord.Embed(title="Work", description=f"Not so fast! You can work again {time_stamp}.\n{boost_message}", color=0xff0000)
         await ctx.reply(embed=embed)
     else:
+        time_now = datetime.datetime.now()
+        time_stamp = time_now + datetime.timedelta(seconds=calc_cooldown)
+        time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
         earning_min = job_data['earning_min']
         earning_max = job_data['earning_max']
         earnings = random.randint(earning_min, earning_max)
@@ -62,6 +68,8 @@ async def work(ctx):
         user_data['stats']['total_works'] += 1
         user_data['stats']['works'][user_job] += 1
         user_data['stats']['seconds_worked'] += calc_cooldown
+        if user_data['stats']['max_coins'] < user_data['coin_balance']:
+            user_data['stats']['max_coins'] = user_data['coin_balance']
         user_data['hunger'] -= 1
         if user_data['hunger'] < 0:
             reply_answer = zero_hunger_message(user_data['id'])
@@ -74,15 +82,15 @@ async def work(ctx):
         data_handler.save_user_data(user_id, user_data)
         random_work_messages = work_messages[user_data['work_job']]
         random_work_message = random.choice(random_work_messages)
-        work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again in {calc_cooldown} seconds.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
+        work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
         embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
+        if user_data['hunger'] == 0:
+            work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}.\n## You are about to faint due to lack of hunger! Consider eating something using `|use [food]`.\nYou will lose half of your coins if you faint."
+            embed = discord.Embed(title="Work", description=work_message, color=0xffff00)
         await ctx.reply(embed=embed)
 
 @client.command()
 async def bal(ctx, user: discord.Member = None, *args):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     if user is None:
         user = ctx.author
 
@@ -96,12 +104,19 @@ async def bal(ctx, user: discord.Member = None, *args):
             await ctx.reply("This user hasn't used the bot yet. Perhaps ask them to run a command?")
     else:
         user_data = data_handler.get_user_data(user_id)
+        masked = False
+        if 'mask_user' in user_data:
+            user_id = user_data['mask_user']
+            user_data = data_handler.get_user_data(user_id)
+            print("MASKED USER AS ", user_id)
+            masked = True
+            user = await client.fetch_user(user_id)
         balance = user_data['coin_balance']
         bank_balance = user_data['bank_balance']
         bank_lvl = user_data['bank_lvl']
         user_publicname = user.display_name
 
-        if user != ctx.author:
+        if user_id != ctx.author.id and not masked:
             bank_info = ""
         elif bank_lvl == 0:
             bank_info = f"""**Bank**
@@ -120,9 +135,6 @@ async def bal(ctx, user: discord.Member = None, *args):
 
 @client.command()
 async def inv(ctx, user: discord.Member = None):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     if user is None:
         user = ctx.author
 
@@ -138,7 +150,16 @@ async def inv(ctx, user: discord.Member = None):
         await ctx.reply("# ERROR: Your user data is corrupted. Please contact the bot owner.\nThis is a fatal error and you have lost all of your data. Please DM <@1272666435063251057> **AS SOON AS POSSIBLE** for the possibility of restoring your data. This should hopefully never happen again. Thank you for your understanding.")
 
     user_data = data_handler.get_user_data(user_id)
-    inventory_list = "\n".join(f"* {id_to_name[item]}" for item in user_data['inventory'])
+    masked = False
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
+        user_data = data_handler.get_user_data(user_id)
+        masked = True
+        print("MASKED USER AS ", user_id)
+        user = await client.fetch_user(user_id)
+    inventory_list = ''
+    for item in user_data['inventory'].keys():
+        inventory_list += f"* {id_to_name[item]} x{user_data['inventory'][item]}\n"
 
     embed = discord.Embed(
         title=f"{user.display_name}'s Inventory",
@@ -147,7 +168,7 @@ async def inv(ctx, user: discord.Member = None):
     )
     embed.add_field(name="Food Items", value=inventory_list or "No items")
     
-    if user == ctx.author:
+    if user == ctx.author or masked:
         vehicle_list = "\n".join(f"* {id_to_name[vehicle]}" for vehicle in user_data['vehicles'])
         embed.add_field(name="Vehicles", value=vehicle_list or "No vehicles")
     
@@ -157,15 +178,16 @@ async def inv(ctx, user: discord.Member = None):
 
 @client.command()
 async def dep(ctx, amount):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     user_id = ctx.author.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json == "added":
         await ctx.reply(welcome_output)
     else:
         user_data = data_handler.get_user_data(user_id)
+        if 'mask_user' in user_data:
+            user_id = user_data['mask_user']
+            user_data = data_handler.get_user_data(user_id)
+            user = await client.fetch_user(user_id)
         if user_data['bank_lvl'] == 0:
             await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
             return
@@ -221,15 +243,16 @@ async def dep(ctx, amount):
 
 @client.command()
 async def withdraw(ctx, amount):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     user_id = ctx.author.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json == "added":
         await ctx.reply(welcome_output)
     else:
         user_data = data_handler.get_user_data(user_id)
+        if 'mask_user' in user_data:
+            user_id = user_data['mask_user']
+            user_data = data_handler.get_user_data(user_id)
+            user = await client.fetch_user(user_id)
         if user_data['bank_lvl'] == 0:
             await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
             return
@@ -280,14 +303,6 @@ def create_shop_embed(index, shop, shop_name):
 
 @client.command()
 async def shop(ctx, shop_name=None):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
-    print("shopping for", shop_name)
-    # if dm, send error message
-    if ctx.guild is None:
-        await ctx.send("`|shop` is currently broken in DMs. Please use it in a server.")
-        return
     if shop_name:
         if shop_name.lower() == "food" or shop_name.lower() == "foods":
             await display_food_shop(ctx)
@@ -370,7 +385,11 @@ async def display_food_shop(ctx):
                     await ctx.send("You do not have enough coins to purchase this item.")
                 else:
                     user_data['coin_balance'] -= item['price']
-                    user_data['inventory'].append(item['id'])
+                    if item['id'] in user_data['inventory']:
+                        user_data['inventory'][item['id']] += 1
+                    else:
+                        user_data['inventory'][item['id']] = 1
+                    user_data['stats']['food_bought'] += 1
                     data_handler.save_user_data(ctx.author.id, user_data)
                     await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
         except Exception as e:
@@ -479,11 +498,11 @@ def upgrade_shop_embed(user_id, shop_name, user_data):
             color=0x00ff00
         )
         if current_bank_info['interest'] > 0:
-            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins\n**Interest**: {current_bank_info['interest']}% per day")
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins\n**Interest**: {current_bank_info['interest']*100}% per day")
         else:
             embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins")
         if next_bank_info['interest'] > 0:
-            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins\n**Interest**: {next_bank_info['interest']}% per day")
+            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins\n**Interest**: {next_bank_info['interest']*100}% per day")
         else:
             embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins")
         embed.set_footer(text="Page 1 of 3")
@@ -595,9 +614,6 @@ def create_job_embed(index):
 
 @client.command()
 async def jobs(ctx):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     current_index = 0
     message = await ctx.send(embed=create_job_embed(current_index))
 
@@ -639,30 +655,54 @@ async def jobs(ctx):
         except Exception as e:
             break
 
+quick_shop_items = {
+    "sausage": 10,
+    "orange": 20,
+    "burger": 50,
+    "spaghetti": 100,
+}
+
 @client.command()
 async def use(ctx, item_name):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     user_data = data_handler.get_user_data(ctx.author.id)
     inventory = user_data['inventory']
-    if len(inventory) == 0:
-        await ctx.send(f"You do not have any items in your inventory, therefore you cannot use {id_to_name[item_name]}.")
-        return
     if item_name not in inventory:
+        if user_data['settings']['auto_buy'] == True:
+            if item_name in quick_shop_items:
+                price = quick_shop_items[item_name]
+                if user_data['coin_balance'] < price:
+                    await ctx.send(f"You don't have a {id_to_name[item_name]} in your inventory and you don't have enough coins to buy it either.")
+                    return
+                user_data['coin_balance'] -= price
+                refill = food_hunger_refill[item_name]
+                user_data['hunger'] += refill
+                if user_data['hunger'] > user_data['hunger_max']:
+                    user_data['hunger'] = user_data['hunger_max']
+                embed = discord.Embed(title="Tasty!", color=0x00ff00)
+                embed.add_field(name="Hunger", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
+                embed.add_field(name="Food Consumed", value=id_to_name[item_name])
+                user_data['stats']['food_eaten'] += 1
+                data_handler.save_user_data(ctx.author.id, user_data)
+                await ctx.send(f"You bought a {id_to_name[item_name]} for {price} coins and ate it, which refilled your hunger by {refill} points. Your hunger bar is now at {user_data['hunger']} points.\n-# You have automatically spent {price} coins due to your Auto Buy setting. Run `|settings` to change this behavior.", embed=embed)
+                return
+            await ctx.send(f"You do not have {id_to_name[item_name]} in your inventory. Maybe you can buy it from the shop?")
+            return
         await ctx.send(f"You do not have {id_to_name[item_name]} in your inventory. Maybe you can buy it from the shop?")
         return
-    # get item type
+    # item must be in inventory
     item_type = item_type_from_id[item_name]
     if item_type == "food" or item_type == "debug":
         refill = food_hunger_refill[item_name]
         user_data['hunger'] += refill
         if user_data['hunger'] > user_data['hunger_max']:
             user_data['hunger'] = user_data['hunger_max']
-        inventory.remove(item_name)
+        inventory["inventory"][item_name] -= 1
+        if inventory["inventory"][item_name] == 0:
+            del inventory["inventory"][item_name]
         embed = discord.Embed(title="Tasty!", color=0x00ff00)
         embed.add_field(name="Hunger", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
         embed.add_field(name="Food Consumed", value=id_to_name[item_name])
+        user_data['stats']['food_eaten'] += 1
         data_handler.save_user_data(ctx.author.id, user_data)
         await ctx.send(f"You ate a {id_to_name[item_name]} and refilled your hunger by {refill} points. Your hunger bar is now at {user_data['hunger']} points.", embed=embed)
     else:
@@ -672,18 +712,9 @@ async def use(ctx, item_name):
 async def eat(ctx, item_name):
     await use(ctx, item_name)
 
-quick_shop_items = {
-    "sausage": 10,
-    "orange": 20,
-    "burger": 50,
-    "spaghetti": 100,
-}
 
 @client.command()
 async def buy(ctx, item_name, amount=1):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     user_data = data_handler.get_user_data(ctx.author.id)
     if item_name in quick_shop_items:
         price = quick_shop_items[item_name]
@@ -701,9 +732,6 @@ async def buy(ctx, item_name, amount=1):
 
 @client.command()
 async def help(ctx, command=None):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     if command:
         command = command.lower()
         if command in command_help:
@@ -789,9 +817,10 @@ async def reset(ctx):
                     encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
                     print(encrypted_user_data)
                     data_handler.drop_user(ctx.author.id)
-                    embed = discord.Embed(title="Data Reset", description=f"Your data has been deleted from our servers completely. Thank you for using Sasbot and we hope you return! If you already regret losing this data, your recovery phrase is below.", color=0xff0000)
-                    embed.set_footer(text=f"Recovery Phrase: {encrypted_user_data}")
-                    await ctx.send("Your data has been reset. You are now starting from scratch.", embed=embed)
+                    embed = discord.Embed(title="Data Reset", description=f"Your data has been deleted from our servers completely. Thank you for using Sasbot and we hope you return! If you already regret losing this data, your recovery phrase is below.\n\n```\n{encrypted_user_data.decode('utf-8')}\n```", color=0xff0000)
+                    # embed.set_footer(text=f"Recovery Phrase: {encrypted_user_data}")
+                    # embed.add_field(name="Recovery Phrase", value=f"```{str(encrypted_user_data)}```")
+                    await ctx.reply("Your data has been reset. You are now starting from scratch.", embed=embed)
                 else:
                     await ctx.send("Reset cancelled.")
             except Exception as e:
@@ -803,6 +832,18 @@ async def reset(ctx):
         await ctx.send("Reset cancelled.")
 
 @client.command()
+async def restore(ctx, user, string):
+    string = string.encode('utf-8')
+    secret_key = os.getenv('SECRET_KEY')
+    secret_key = secret_key.encode('utf-8')
+    f = Fernet(secret_key)
+    decrypted_user_data = f.decrypt(string).decode('utf-8')
+    user_data = ast.literal_eval(decrypted_user_data)
+    data_handler.save_user_data(user, user_data)
+    await ctx.send("User data restored.")
+    
+
+@client.command()
 async def debug(ctx):
     if ctx.guild is None:
         await ctx.send(f"Nice try. Your User ID is clearly {ctx.author.id} which does not match my owner's. Please never try this command again.", embed=bot_dm_embed)
@@ -811,7 +852,7 @@ async def debug(ctx):
         await ctx.send("Debug embed modal sent to DM.")
         await ctx.author.send("Pong!")
         time.sleep(6)
-        embed = discord.Embed(title="Controller_COINS", description="Added 1000 coins to <@773996537414942763>. Pong!", color=0x00ff00)
+        embed = discord.Embed(title="Controller_COINS", description="Masked as 1092171050269294602", color=0x00ff00)
         await ctx.send(embed=embed)
         time.sleep(2)
         await ctx.send("Ended debug session with owner. Debug embed deleted.")
@@ -819,30 +860,46 @@ async def debug(ctx):
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
 
-badwords = []
+@client.command()
+async def mask(ctx, user: discord.Member = None):
+    if ctx.author.id == 773996537414942763:
+        if user is None:
+            user_data = data_handler.get_user_data(ctx.author.id)
+            if 'mask_user' in user_data:
+                del user_data['mask_user']
+                data_handler.save_user_data(ctx.author.id, user_data)
+                await ctx.send("You have been unmasked.")
+            return
+        user_data = data_handler.get_user_data(ctx.author.id)
+        user_data['mask_user'] = user.id
+        data_handler.save_user_data(ctx.author.id, user_data)
+        await ctx.send(f"You have been masked as {user.id}.")
+        return
+    else:
+        error = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
+        await ctx.send("Command not found! Error! Don't run this anymore!", embed=error)
+        return
+
+badwords = ["anal", "anus", "arse", "ass", "ballsack", "balls", "bastard", "bitch", "biatch", "bloody", "blowjob", "blow job", "bollock", "bollok", "boner", "boob", "bugger", "buttplug", "clitoris", "cock", "coon", "crap", "cunt", "damn", "dick", "dildo", "dyke", "fag", "feck", "fellate", "fellatio", "felching", "fuck", "f u c k", "fudgepacker", "fudge packer", "goddamn", "god damn", "hell", "homo", "jerk", "jizz", "knobend", "knob end", "labia", "muff", "nigger", "n1gg", "nigg", "nigga", "penis", "piss", "poop", "prick", "pube", "pussy", "scrotum", "sex", "shit", "s hit", "sh1t", "slut", "smegma", "spooge", "spunk", "tits", "tosser", "turd", "twat", "vagina", "wank", "whore", "pemberton", "853041781817475112"]
 
 @client.event
 async def on_message(ctx):
     if ctx.author.bot:
         return
-    if ctx.guild is None:
-        if ctx.author.id == 773996537414942763:
-            await ctx.reply(f"Pong! Response time: {round(client.latency * 1000)}ms")
+    if ctx.guild is None and ctx.author.id != 773996537414942763:
         await ctx.reply("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
         return
     user_data = data_handler.get_user_data(ctx.author.id)
-    if user_data['settings']['detect_bad_words'] == True:
-        for badword in badwords:
-            if badword in ctx.content.lower():
-                await ctx.reply("Bad word detected.")
-                return
+    for badword in badwords:
+        if badword in ctx.content.lower():
+            if user_data['settings']['detect_bad_words'] == True:
+                await ctx.reply("Bad word detected!")
+            user_data['stats']['bad_words'] += 1
+            return
     await client.process_commands(ctx)        
 
 @client.command()
 async def sell(ctx, item_name, amount=1):
-    if ctx.guild is None:
-        await ctx.send("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
-        return
     user_data = data_handler.get_user_data(ctx.author.id)
     if item_name == 'all':
         total_price = 0
@@ -853,6 +910,8 @@ async def sell(ctx, item_name, amount=1):
             total_price += price
         user_data['coin_balance'] += total_price
         user_data['inventory'] = []
+        if user_data['coin_balance'] > user_data['stats']['max_coins']:
+            user_data['stats']['max_coins'] = user_data['coin_balance']
         data_handler.save_user_data(ctx.author.id, user_data)
         await ctx.send(f"You have sold all of your items for {total_price} coins!")
         return
@@ -866,7 +925,151 @@ async def sell(ctx, item_name, amount=1):
     user_data['coin_balance'] += price * amount
     for _ in range(amount):
         user_data['inventory'].remove(item_name)
+    if user_data['coin_balance'] > user_data['stats']['max_coins']:
+        user_data['stats']['max_coins'] = user_data['coin_balance']
     data_handler.save_user_data(ctx.author.id, user_data)
     await ctx.send(f"You have sold {amount} {id_to_name[item_name]} for {price * amount} coins!")
+
+def generate_settings_embed(user_id):
+    user_data = data_handler.get_user_data(user_id)
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
+        user_data = data_handler.get_user_data(user_id)
+    user_settings = user_data['settings']
+    embed = discord.Embed(
+        title="User Settings",
+        description="There are currently 2 settings you can toggle on or off. Use the associated reactions to toggle the settings.",
+        color=0x00ff00
+    )
+    if user_settings['detect_bad_words'] == True:
+        embed.add_field(name="Detect Bad Words 🤬", value="Uses the bad word detection filter from in game to ping you whenever you send an offending message!\nEnabled ✅")
+    else:
+        embed.add_field(name="Detect Bad Words 🤬", value="Uses the bad word detection filter from in game to ping you whenever you send an offending message!\nDisabled ❌")
+    if user_settings['auto_buy'] == True:
+        embed.add_field(name="Auto Buy 💰", value="Forget about buying food! When you run `|eat` and don't have the food item in your inventory, it will automatically buy it.\nEnabled ✅")
+    else:
+        embed.add_field(name="Auto Buy 💰", value="Forget about buying food! When you run `|eat` and don't have the food item in your inventory, it will automatically buy it.\nDisabled ❌")
+    embed.set_footer(text="Page 1 of 1")
+    return embed
+
+@client.command()
+async def settings(ctx):
+    # create an embed with the user's settings and allow them to toggle switches using reactions
+    user_data = data_handler.get_user_data(ctx.author.id)
+    message = await ctx.send(embed=generate_settings_embed(ctx.author.id))
+    await message.add_reaction('🤬')
+    await message.add_reaction('💰')
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🤬', '💰']
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+            await message.remove_reaction(reaction, user)
+            if str(reaction.emoji) == '🤬':
+                user_data['settings']['detect_bad_words'] = not user_data['settings']['detect_bad_words']
+            elif str(reaction.emoji) == '💰':
+                user_data['settings']['auto_buy'] = not user_data['settings']['auto_buy']
+            data_handler.save_user_data(ctx.author.id, user_data)
+            await message.edit(embed=generate_settings_embed(ctx.author.id))
+        except Exception as e:
+            break
+
+@tasks.loop(hours=24)
+async def apply_interest():
+    users = data_handler.get_all_users()
+    for user_id in users:
+        user_data = data_handler.get_user_data(user_id)
+        bank_lvl = user_data['bank_lvl']
+        interest = bank_levels[bank_lvl]['interest']
+        print(f"Applying {interest}% interest to {user_id}'s bank balance.")
+        if interest > 0:
+            user_data['bank_balance'] += user_data['bank_balance'] * (interest / 100)
+            if user_data['bank_balance'] > bank_levels[bank_lvl]['capacity']:
+                user_data['bank_balance'] = bank_levels[bank_lvl]['capacity']
+                user = await client.fetch_user(user_id)
+                data_handler.save_user_data(user_id, user_data)
+                await user.send(f"Your bank balance has been increased by {interest}% interest. However, your bank balance has reached its maximum capacity of {bank_levels[bank_lvl]['capacity']} coins. Please upgrade your bank to increase its capacity or withdraw coins.")
+                break
+            data_handler.save_user_data(user_id, user_data)
+            user = await client.fetch_user(user_id)
+            await user.send(f"Your bank balance has been increased by {interest*100}% interest. Your new balance is {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+
+async def wait_until_midnight_pst():
+    tz = pytz.timezone('US/Pacific')
+    now = datetime.datetime.now(tz)
+    # Calculate time until the next 00:00 PST
+    next_midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    # next_midnight = (now + datetime.timedelta(seconds=20))
+    time_until_midnight = (next_midnight - now).total_seconds()
+    print(f"Waiting until midnight PST ({next_midnight}) in {time_until_midnight} seconds")
+    await asyncio.sleep(time_until_midnight)
+    apply_interest.start()
+
+@client.command()
+async def give(ctx, member: discord.Member, amount: int, type="coins"):
+    user_id = ctx.author.id
+    user_data = data_handler.get_user_data(user_id)
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
+        user_data = data_handler.get_user_data(user_id)
+        print(f"Masked user: {user_id}")
+    if ctx.author.id == 773996537414942763:
+        if type == "coins":
+            user_data = data_handler.get_user_data(member.id)
+            user_data['coin_balance'] += amount
+            data_handler.save_user_data(member.id, user_data)
+            await ctx.send(f"Added {amount} coins to {member.mention}'s account.")
+            return
+        type_ = item_type_from_id[type]
+        if type_ == "food":
+            user_data = data_handler.get_user_data(member.id)
+            for _ in range(amount):
+                user_data['inventory'].append(type)
+            data_handler.save_user_data(member.id, user_data)
+            await ctx.send(f"Gave {member.mention} {amount} {id_to_name[type]}.")
+            return
+        if type_ == "vehicle" or type == "debug":
+            user_data = data_handler.get_user_data(member.id)
+            user_data['vehicles'].append(type)
+            if amount == -1:
+                user_data['vehicle'] = type
+                await ctx.send(f"Gave {member.mention} {id_to_name[type]}. Equipped.")
+            elif amount == 0:
+                # remove vehicle
+                user_data['vehicles'].remove(type)
+                if user_data['vehicle'] == type:
+                    user_data['vehicle'] = None
+                    await ctx.send(f"Removed {member.mention}'s {id_to_name[type]}. Unequipped.")
+                else:
+                    await ctx.send(f"Removed {member.mention}'s {id_to_name[type]}. Was not equipped.")
+            else:
+                await ctx.send(f"Gave {member.mention} {id_to_name[type]}. Not equipped.")
+            data_handler.save_user_data(member.id, user_data)
+            return
+        await ctx.send("That item type does not exist. Please check your spelling and try again.")
+    else:
+        # ignore type, only allow coins
+        if type == "coins":
+            if amount > user_data['coin_balance']:
+                await ctx.send("You do not have enough coins to give that amount.")
+                return
+            if amount < 0:
+                await ctx.send("You cannot give a negative amount of coins.")
+                return
+            user_data = data_handler.get_user_data(member.id)
+            user_data['coin_balance'] += amount
+            data_handler.save_user_data(member.id, user_data)
+            user_data = data_handler.get_user_data(user_id)
+            user_data['coin_balance'] -= amount
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.send(f"Gave {member.mention} {amount} coins. You now have {user_data['coin_balance']} coins.")
+            return
+        return
+
+@client.event
+async def on_ready():
+    print(f'{client.user} is connected and ready!')
+    await wait_until_midnight_pst()
+    # apply_interest.start()
 
 client.run(os.getenv('TOKEN'))

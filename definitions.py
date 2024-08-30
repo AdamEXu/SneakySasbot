@@ -1,23 +1,33 @@
 import discord
 
 # Migration utilities for updating user data versions
-current_user_data_version = 2
+current_user_data_version = 4
 
 help_output = """
 This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
 
+For more information on a specific command, run `|help [command]`.
+
 **ECONOMY**
 Make money using `|work`
 Explore other jobs using `|jobs`
-Buy useful items in the shop with `|shop`
+Buy food, vehicles, and more in the shop with `|shop`
 Check how many coins you have with `|bal`
 See your inventory with `|inv`
+Eat food to refill your hunger bar with `|use [food]`
+To quickly buy food, use `|buy [food] [amount]`
+Deposit your coins in the bank with `|dep [amount]`
+Withdraw your coins from the bank with `|with [amount]`
 
 **FUN**
-View a random Sneaky Sasquatch meme with `|meme` ||If you would like to submit a meme, DM <@773996537414942763>.||
+~~View a random Sneaky Sasquatch meme with `|meme` ||If you would like to submit a meme, DM <@773996537414942763>.||~~
+Coming soon!
 
-This is just an early proof of conecpt.
--# Version 0.1.0
+**UTILITY**
+To change your settings, use `|settings`
+
+If you encounter any problems at all whatsoever, ping <@773996537414942763>.
+-# Version 1.0.0
 """
 
 welcome_output = f"""
@@ -27,7 +37,7 @@ To start making coins, run `|work`.
 Keep an eye on your hunger bar! If it hits 0, there will be consequences. To fill it, run `|eat [food]`, where food is the name of the food you want to eat.
 To see what is in your inventory (and see what food you have to eat), run `|inv`.
 
-Take a look at `|help` for more information.
+Take a look at `|help` for more information. If you encounter any problems at all whatsoever, ping <@773996537414942763>. (Yes I just pinged myself)
 """
 
 food_shop_items = [

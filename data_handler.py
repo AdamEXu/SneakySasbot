@@ -20,7 +20,7 @@ def ensure_user_in_json(user_id):
       "last_work": 0,
       "vehicles": [],
       "vehicle": "",
-      "inventory": [],
+      "inventory": {},
       "hunger": 6,
       "hunger_max": 6,
       "bank_balance": 0,
@@ -39,6 +39,10 @@ def ensure_user_in_json(user_id):
           "newspaper": 0,
           "paramedic": 0,
           "police": 0,
+          "doctor": 0,
+          "ferry": 0,
+          "trash": 0,
+          "mushroom": 0,
           "port": 0
         },
         "seconds_worked": 0,
@@ -83,7 +87,7 @@ def ensure_user_in_json(user_id):
           if 'hunger_max' not in user:
             user['hunger_max'] = 6
           if 'inventory' not in user:
-            user['inventory'] = []
+            user['inventory'] = {}
           if 'vehicle' not in user:
             user['vehicle'] = ""
           if 'vehicles' not in user:
@@ -105,6 +109,10 @@ def ensure_user_in_json(user_id):
                 "newspaper": 0,
                 "paramedic": 0,
                 "police": 0,
+                "doctor": 0,
+                "ferry": 0,
+                "trash": 0,
+                "mushroom": 0,
                 "port": 0
               },
               "seconds_worked": 0,
@@ -145,7 +153,19 @@ def ensure_user_in_json(user_id):
             for field in stat_fields:
               if field not in user['stats']:
                 user['stats'][field] = 0
-            user['data_version'] = current_user_data_version
+          if user['data_version'] < 4:
+            print("Migrating inventory to new format")
+            new_inventory = {}
+            for item in user['inventory']:
+              if item in new_inventory:
+                new_inventory[item] += 1
+              else:
+                new_inventory[item] = 1
+            user['inventory'] = new_inventory
+            print(user['inventory'])
+            user['data_version'] = 4
+            print("Inventory migrated")
+          user['data_version'] = current_user_data_version
         except Exception as e:
           print(e)
           return "corrupted"
@@ -186,3 +206,21 @@ def get_vehicle_data(vehicle):
       if vehicle == v['name']:
         return v
   return None
+
+def get_all_users():
+  users = []
+  with open('data.json', 'r') as f:
+    userjson = json.load(f)
+  for user in userjson:
+    users.append(user['id'])
+  return users
+
+def drop_user(user_id):
+  with open('data.json', 'r') as f:
+    users = json.load(f)
+    for i in range(len(users)):
+      if user_id == users[i]['id']:
+        del users[i]
+        break
+  with open('data.json', 'w') as f:
+    json.dump(users, f, indent=2)
