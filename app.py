@@ -938,6 +938,11 @@ async def on_message(ctx):
                 await ctx.reply("Bad word detected!")
             user_data['stats']['bad_words'] += 1
             return
+    if ctx.content.startswith("|"):
+        user_data = data_handler.get_user_data(ctx.author.id)
+        user_data['coin_balance'] = round(user_data['coin_balance'])
+        user_data['bank_balance'] = round(user_data['bank_balance'])
+        data_handler.save_user_data(ctx.author.id, user_data)
     await client.process_commands(ctx)        
 
 @client.command()
@@ -1032,6 +1037,9 @@ async def apply_interest():
                 data_handler.save_user_data(user_id, user_data)
                 await user.send(f"Your bank balance has been increased by {interest}% interest. However, your bank balance has reached its maximum capacity of {bank_levels[bank_lvl]['capacity']} coins. Please upgrade your bank to increase its capacity or withdraw coins.")
                 break
+            # round to nearest whole number
+            user_data['coin_balance'] = round(user_data['coin_balance'])
+            user_data['bank_balance'] = round(user_data['bank_balance'])
             data_handler.save_user_data(user_id, user_data)
             user = await client.fetch_user(user_id)
             await user.send(f"Your bank balance has been increased by {interest*100}% interest. Your new balance is {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
