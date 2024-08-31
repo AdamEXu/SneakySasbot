@@ -866,7 +866,7 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             return
         elif command == "foodmeter":
             user_data = data_handler.get_user_data(user.id)
-            user_data['hunger'] = args[0]
+            user_data['hunger'] = int(args[0])
             data_handler.save_user_data(user.id, user_data)
             await ctx.send(f"Food meter for {user.id} set to {args[0]}")
             return
@@ -884,13 +884,13 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             return
         elif command == "banklvl":
             user_data = data_handler.get_user_data(user.id)
-            user_data['bank_lvl'] = args[0]
+            user_data['bank_lvl'] = int(args[0])
             data_handler.save_user_data(user.id, user_data)
             await ctx.send(f"Bank level for {user.id} set to {args[0]}")
             return
         elif command == "hungerlvl":
             user_data = data_handler.get_user_data(user.id)
-            user_data['hunger_max'] = args[0]
+            user_data['hunger_max'] = int(args[0])
             data_handler.save_user_data(user.id, user_data)
             await ctx.send(f"Hunger level for {user.id} set to {args[0]}")
             return
