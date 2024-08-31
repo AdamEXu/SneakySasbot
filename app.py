@@ -846,18 +846,58 @@ async def restore(ctx, user, string):
     
 
 @client.command()
-async def debug(ctx):
+async def debug(ctx, command, user: discord.Member = None, *args):
     if ctx.guild is None:
         await ctx.send(f"Nice try. Your User ID is clearly {ctx.author.id} which does not match my owner's. Please never try this command again.", embed=bot_dm_embed)
         return
     elif ctx.author.id == 773996537414942763:
-        await ctx.send("Debug embed modal sent to DM.")
-        await ctx.author.send("Pong!")
-        time.sleep(6)
-        embed = discord.Embed(title="Controller_COINS", description="Masked as 1092171050269294602", color=0x00ff00)
-        await ctx.send(embed=embed)
-        time.sleep(2)
-        await ctx.send("Ended debug session with owner. Debug embed deleted.")
+        commands = ["cooldown", "foodmeter", "job", "vehicle", "banklvl", "hungerlvl", "reset_debug_DANGER"]
+        if command not in commands:
+            embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
+            await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
+            return
+        if user is None:
+            user = ctx.author
+        if command == "cooldown":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['last_work'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Cooldown for {user.id} set to {args[0]}")
+            return
+        elif command == "foodmeter":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['hunger'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Food meter for {user.id} set to {args[0]}")
+            return
+        elif command == "job":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['work_job'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Job for {user.id} set to {args[0]}")
+            return
+        elif command == "vehicle":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['vehicle'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Vehicle for {user.id} set to {args[0]}")
+            return
+        elif command == "banklvl":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['bank_lvl'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Bank level for {user.id} set to {args[0]}")
+            return
+        elif command == "hungerlvl":
+            user_data = data_handler.get_user_data(user.id)
+            user_data['hunger_max'] = args[0]
+            data_handler.save_user_data(user.id, user_data)
+            await ctx.send(f"Hunger level for {user.id} set to {args[0]}")
+            return
+        elif command == "reset_debug_DANGER":
+            data_handler.drop_user(user.id)
+            await ctx.send(f"User {user.id} has removed from the database.")
+            return
     else:
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
