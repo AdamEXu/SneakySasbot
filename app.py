@@ -907,7 +907,7 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             f = Fernet(secret_key)
             encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
             print(encrypted_user_data)
-            ctx.send(f"Debug User Data: {encrypted_user_data.decode('utf-8')}")
+            await ctx.send(f"Debug User Data: {encrypted_user_data.decode('utf-8')}")
     else:
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
