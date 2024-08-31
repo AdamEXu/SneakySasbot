@@ -951,6 +951,7 @@ async def on_message(ctx):
             if user_data['settings']['detect_bad_words'] == True:
                 await ctx.reply("Bad word detected!")
             user_data['stats']['bad_words'] += 1
+            data_handler.save_user_data(user_data)
             return
     await client.process_commands(ctx)        
 
