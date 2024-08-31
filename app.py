@@ -851,7 +851,7 @@ async def debug(ctx, command, user: discord.Member = None, *args):
         await ctx.send(f"Nice try. Your User ID is clearly {ctx.author.id} which does not match my owner's. Please never try this command again.", embed=bot_dm_embed)
         return
     elif ctx.author.id == 773996537414942763:
-        commands = ["cooldown", "foodmeter", "job", "vehicle", "banklvl", "hungerlvl", "reset_debug_DANGER"]
+        commands = ["cooldown", "foodmeter", "job", "vehicle", "banklvl", "hungerlvl", "reset_debug_DANGER", "save_data"]
         if command not in commands:
             embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
             await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
@@ -898,6 +898,16 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             data_handler.drop_user(user.id)
             await ctx.send(f"User {user.id} has removed from the database.")
             return
+        elif command == "save_data":
+            user_data = data_handler.get_user_data(user.id)
+            user_data_base64 = base64.b64encode(str(user_data).encode('utf-8')).decode('utf-8')
+            secret_key = os.getenv('SECRET_KEY')
+            secret_key = secret_key.encode('utf-8')
+            print(secret_key)
+            f = Fernet(secret_key)
+            encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
+            print(encrypted_user_data)
+            ctx.send(f"Debug User Data: {encrypted_user_data.decode('utf-8')}")
     else:
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
