@@ -574,7 +574,6 @@ async def display_special_shop(ctx):
                         else:
                             user_data['coin_balance'] -= next_bank_info['price']
                             user_data['bank_lvl'] += 1
-                            user_data['bank_balance'] = 0
                             data_handler.save_user_data(ctx.author.id, user_data)
                             await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
                             await ctx.send(f"You have upgraded your bank to level {bank_lvl + 1}!")
