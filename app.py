@@ -860,7 +860,7 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             user = ctx.author
         if command == "cooldown":
             user_data = data_handler.get_user_data(user.id)
-            user_data['last_work'] = args[0]
+            user_data['last_work'] = int(args[0])
             data_handler.save_user_data(user.id, user_data)
             await ctx.send(f"Cooldown for {user.id} set to {args[0]}")
             return
@@ -938,11 +938,6 @@ async def on_message(ctx):
                 await ctx.reply("Bad word detected!")
             user_data['stats']['bad_words'] += 1
             return
-    if ctx.content.startswith("|"):
-        user_data = data_handler.get_user_data(ctx.author.id)
-        user_data['coin_balance'] = round(user_data['coin_balance'])
-        user_data['bank_balance'] = round(user_data['bank_balance'])
-        data_handler.save_user_data(ctx.author.id, user_data)
     await client.process_commands(ctx)        
 
 @client.command()
