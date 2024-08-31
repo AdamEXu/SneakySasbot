@@ -851,7 +851,7 @@ async def debug(ctx, command, user: discord.Member = None, *args):
         await ctx.send(f"Nice try. Your User ID is clearly {ctx.author.id} which does not match my owner's. Please never try this command again.", embed=bot_dm_embed)
         return
     elif ctx.author.id == 773996537414942763:
-        commands = ["cooldown", "foodmeter", "job", "vehicle", "banklvl", "hungerlvl", "reset_debug_DANGER", "save_data"]
+        commands = ["cooldown", "foodmeter", "job", "vehicle", "banklvl", "hungerlvl", "reset_debug_DANGER", "save_data", "get_stat"]
         if command not in commands:
             embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
             await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
@@ -908,6 +908,10 @@ async def debug(ctx, command, user: discord.Member = None, *args):
             encrypted_user_data = f.encrypt(user_data_base64.encode('utf-8'))
             print(encrypted_user_data)
             await ctx.send(f"Debug User Data: {encrypted_user_data.decode('utf-8')}")
+            return
+        elif command == "get_stat":
+            user_data = data_handler.get_user_data(user.id)
+            await ctx.send(f"{user.id} has {user_data['stats'][args[0]]} {args[0]}")
     else:
         embed = discord.Embed(title="Error", description="This command does not exist. Pinky promise.", color=0x00ffff)
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=embed)
