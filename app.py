@@ -948,7 +948,7 @@ async def on_message(ctx):
     if ctx.guild is None and ctx.author.id != 773996537414942763:
         await ctx.reply("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
         return
-    if ctx.channel.id != 1279662904806998147:
+    if ctx.channel.id != 1279662904806998147 and os.environ.get('DEBUG') == "True":
         return
     user_data = data_handler.get_user_data(ctx.author.id)
     for badword in bad_words:
