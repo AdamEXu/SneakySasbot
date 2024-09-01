@@ -54,7 +54,8 @@ def ensure_user_in_json(user_id):
       },
       "settings": {
         "auto_buy": False,
-        "detect_bad_words": False
+        "detect_bad_words": False,
+        "interest_dm": True
       },
       "date_joined": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
@@ -96,6 +97,12 @@ def ensure_user_in_json(user_id):
             user['last_work'] = 0
           if 'work_job' not in user:
             user['work_job'] = "campground"
+          if 'settings' not in user:
+            user['settings'] = {
+              "auto_buy": False,
+              "detect_bad_words": False,
+              "interest_dm": True
+            }
           if 'stats' not in user:
             print("Migrating user stats")
             user['stats'] = {
@@ -135,7 +142,8 @@ def ensure_user_in_json(user_id):
             print("Migrating user settings")
             user['settings'] = {
               "auto_buy": False,
-              "detect_bad_words": False
+              "detect_bad_words": False,
+              "interest_dm": True
             }
             print("User settings migrated to default values")
           if 'earnings' in user:
@@ -165,6 +173,9 @@ def ensure_user_in_json(user_id):
             print(user['inventory'])
             user['data_version'] = 4
             print("Inventory migrated")
+          if user['data_version'] < 5:
+            print("Migrating user data to version 5")
+            user['settings']['interest_dm'] = True
           user['data_version'] = current_user_data_version
         except Exception as e:
           print(e)

@@ -1,7 +1,7 @@
 import discord
 
 # Migration utilities for updating user data versions
-current_user_data_version = 4
+current_user_data_version = 5
 
 help_output = """
 This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
@@ -125,7 +125,25 @@ id_to_name = {
   "bank": "Bank Account Upgrade",
   "food_meter": "Bigger Food Meter",
   "shoes": "Shoes Upgrade",
-  "debug": "Debug Item"
+  "debug": "Debug Item",
+  "campground": "Food Stealer",
+  "fishing": "Fisher",
+  "taxi": "Taxi Driver",
+  "delivery": "Delivery Person",
+  "newspaper": "Photographer",
+  "paramedic": "Paramedic",
+  "police": "Police Officer",
+  "doctor": "Doctor",
+  "ferry": "Ferry Driver",
+  "trash": "Trash Diver",
+  "mushroom": "Mushroom Collector",
+  "port": "Port Robber",
+  "total_coinsearned": "Total Coins Earned",
+  "max_coins": "Highest Coin Balance",
+  "interest_earned": "Interest Earned (from bank)",
+  "food_eaten": "Food Eaten",
+  "food_bought": "Food Bought",
+  "bad_words": "Bad Words Said",
 }
 
 jobs_list = ["campground", "fishing", "taxi", "delivery", "newspaper", "paramedic", "police", "doctor", "ferry", "trash", "mushroom", "port"]

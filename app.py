@@ -935,7 +935,11 @@ async def mask(ctx, user: discord.Member = None):
         await ctx.send("Command not found! Error! Don't run this anymore!", embed=error)
         return
 
-badwords = ["anal", "anus", "arse", "ass", "ballsack", "balls", "bastard", "bitch", "biatch", "bloody", "blowjob", "blow job", "bollock", "bollok", "boner", "boob", "bugger", "buttplug", "clitoris", "cock", "coon", "crap", "cunt", "damn", "dick", "dildo", "dyke", "fag", "feck", "fellate", "fellatio", "felching", "fuck", "f u c k", "fudgepacker", "fudge packer", "goddamn", "god damn", "hell", "homo", "jerk", "jizz", "knobend", "knob end", "labia", "muff", "nigger", "n1gg", "nigg", "nigga", "penis", "piss", "poop", "prick", "pube", "pussy", "scrotum", "sex", "shit", "s hit", "sh1t", "slut", "smegma", "spooge", "spunk", "tits", "tosser", "turd", "twat", "vagina", "wank", "whore", "pemberton", "853041781817475112"]
+bad_words = []
+# load bad words from file which are base64 encoded because the code is open source
+with open("badwords.txt", "r") as f:
+    base64_bad_words = f.read()
+    bad_words = base64.b64decode(base64_bad_words).decode('utf-8').split("\n")
 
 @client.event
 async def on_message(ctx):
@@ -944,8 +948,10 @@ async def on_message(ctx):
     if ctx.guild is None and ctx.author.id != 773996537414942763:
         await ctx.reply("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
         return
+    if ctx.channel.id != 1279662904806998147:
+        return
     user_data = data_handler.get_user_data(ctx.author.id)
-    for badword in badwords:
+    for badword in bad_words:
         if badword in ctx.content.lower():
             if user_data['settings']['detect_bad_words'] == True:
                 await ctx.reply("Bad word detected!")
@@ -994,13 +1000,17 @@ def generate_settings_embed(user_id):
     user_settings = user_data['settings']
     embed = discord.Embed(
         title="User Settings",
-        description="There are currently 2 settings you can toggle on or off. Use the associated reactions to toggle the settings.",
+        description="There are currently 3 settings you can toggle on or off. Use the associated reactions to toggle the settings.",
         color=0x00ff00
     )
     if user_settings['detect_bad_words'] == True:
         embed.add_field(name="Detect Bad Words 🤬", value="Uses the bad word detection filter from in game to ping you whenever you send an offending message!\nEnabled ✅")
     else:
         embed.add_field(name="Detect Bad Words 🤬", value="Uses the bad word detection filter from in game to ping you whenever you send an offending message!\nDisabled ❌")
+    if user_settings['interest_dm'] == True:
+        embed.add_field(name="Interest DMs 🔔", value="Receive a direct message when you earn interest on your bank balance each night at 00:00 PST.\nEnabled ✅")
+    else:
+        embed.add_field(name="Interest DMs 🔔", value="Receive a direct message when you earn interest on your bank balance each night at 00:00 PST.\nDisabled ❌")
     if user_settings['auto_buy'] == True:
         embed.add_field(name="Auto Buy 💰", value="Forget about buying food! When you run `|eat` and don't have the food item in your inventory, it will automatically buy it.\nEnabled ✅")
     else:
@@ -1014,21 +1024,164 @@ async def settings(ctx):
     user_data = data_handler.get_user_data(ctx.author.id)
     message = await ctx.send(embed=generate_settings_embed(ctx.author.id))
     await message.add_reaction('🤬')
+    await message.add_reaction('🔔')
     await message.add_reaction('💰')
     def check(reaction, user):
-        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🤬', '💰']
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🤬', '💰', '🔔']
     while True:
         try:
             reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
             await message.remove_reaction(reaction, user)
             if str(reaction.emoji) == '🤬':
                 user_data['settings']['detect_bad_words'] = not user_data['settings']['detect_bad_words']
+            elif str(reaction.emoji) == '🔔':
+                user_data['settings']['interest_dm'] = not user_data['settings']['interest_dm']
             elif str(reaction.emoji) == '💰':
                 user_data['settings']['auto_buy'] = not user_data['settings']['auto_buy']
             data_handler.save_user_data(ctx.author.id, user_data)
             await message.edit(embed=generate_settings_embed(ctx.author.id))
         except Exception as e:
             break
+
+@client.command()
+async def stats(ctx, stat_book=None, user: discord.Member = None):
+    if user is None:
+        user = ctx.author
+    user_id = user.id
+    user_data = data_handler.get_user_data(user_id)
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
+        user_data = data_handler.get_user_data(user_id)
+    display_name = user.display_name
+    if stat_book is None:
+        embed = discord.Embed(
+            title=f"{display_name}'s Stats",
+            description="Select a reaction to view different categories of stats.",
+            color=0x00ff00
+        )
+        embed.add_field(name="Coin Stats 🪙", value="View stats related to coins and the economy.")
+        embed.add_field(name="Work Stats 💼", value="View stats related to working and jobs.")
+        embed.add_field(name="Misc Stats 📊", value="View miscellaneous stats.")
+        message = await ctx.send(embed=embed)
+        await message.add_reaction('🪙')
+        await message.add_reaction('💼')
+        await message.add_reaction('📊')
+        def check(reaction, user):
+            return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🪙', '💼', '📊']
+        while True:
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                await message.remove_reaction(reaction, user)
+                if str(reaction.emoji) == '🪙':
+                    await message.delete()
+                    await stats(ctx, "coin")
+                    return
+                elif str(reaction.emoji) == '💼':
+                    await message.delete()
+                    await stats(ctx, "work")
+                    return
+                elif str(reaction.emoji) == '📊':
+                    await message.delete()
+                    await stats(ctx, "misc")
+                    return
+            except Exception as e:
+                break
+    if stat_book == "coin":
+        user_stats = user_data['stats']
+        stats_list = ["total_coinsearned", "max_coins", "interest_earned"]
+        embed = discord.Embed(
+            title=f"{display_name}'s Coin Stats",
+            description="View stats related to coins and the economy.",
+            color=0x00ff00
+        )
+        for stat in stats_list:
+            embed.add_field(name=id_to_name[stat], value=user_stats[stat])
+        message = await ctx.send(embed=embed)
+        await message.add_reaction('🪙')
+        await message.add_reaction('💼')
+        await message.add_reaction('📊')
+        def check(reaction, user):
+            return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🪙', '💼', '📊']
+        while True:
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                await message.remove_reaction(reaction, user)
+                if str(reaction.emoji) == '🪙':
+                    await ctx.send("You are already viewing coin stats.")
+                elif str(reaction.emoji) == '💼':
+                    await message.delete()
+                    await stats(ctx, "work")
+                    return
+                elif str(reaction.emoji) == '📊':
+                    await message.delete()
+                    await stats(ctx, "misc")
+                    return
+            except Exception as e:
+                break
+    elif stat_book == "work":
+        user_stats = user_data['stats']
+        embed = discord.Embed(
+            title=f"{display_name}'s Work Stats",
+            description=f"Total Works: {user_stats['total_works']}\nSeconds Worked: {user_stats['seconds_worked']}\nWorks per job:",
+            color=0x00ff00
+        )
+        for job in jobs_list:
+            embed.add_field(name=id_to_name[job], value=user_stats['works'][job])
+        message = await ctx.send(embed=embed)
+        await message.add_reaction('🪙')
+        await message.add_reaction('💼')
+        await message.add_reaction('📊')
+        def check(reaction, user):
+            return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🪙', '💼', '📊']
+        while True:
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                await message.remove_reaction(reaction, user)
+                if str(reaction.emoji) == '🪙':
+                    await message.delete()
+                    await stats(ctx, "coin")
+                    return
+                elif str(reaction.emoji) == '💼':
+                    await ctx.send("You are already viewing work stats.")
+                elif str(reaction.emoji) == '📊':
+                    await message.delete()
+                    await stats(ctx, "misc")
+                    return
+            except Exception as e:
+                print(e)
+                break
+    elif stat_book == "misc":
+        user_stats = user_data['stats']
+        embed = discord.Embed(
+            title=f"{display_name}'s Misc Stats",
+            description="View miscellaneous stats.",
+            color=0x00ff00
+        )
+        stats_list = ["food_eaten", "food_bought", "bad_words"]
+        for stat in stats_list:
+            embed.add_field(name=id_to_name[stat], value=user_stats[stat])
+        message = await ctx.send(embed=embed)
+        await message.add_reaction('🪙')
+        await message.add_reaction('💼')
+        await message.add_reaction('📊')
+        def check(reaction, user):
+            return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🪙', '💼', '📊']
+        while True:
+            try:
+                reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+                await message.remove_reaction(reaction, user)
+                if str(reaction.emoji) == '🪙':
+                    await message.delete()
+                    await stats(ctx, "coin")
+                    return
+                elif str(reaction.emoji) == '💼':
+                    await message.delete()
+                    await stats(ctx, "work")
+                    return
+                elif str(reaction.emoji) == '📊':
+                    await ctx.send("You are already viewing miscellaneous stats.")
+            except Exception as e:
+                break
 
 @tasks.loop(hours=24)
 async def apply_interest():
@@ -1039,6 +1192,7 @@ async def apply_interest():
         interest = bank_levels[bank_lvl]['interest']
         print(f"Applying {interest}% interest to {user_id}'s bank balance.")
         if interest > 0:
+            user_data['stats']['interest_earned'] += user_data['bank_balance'] * (interest / 100)
             user_data['bank_balance'] += user_data['bank_balance'] * (interest / 100)
             if user_data['bank_balance'] > bank_levels[bank_lvl]['capacity']:
                 user_data['bank_balance'] = bank_levels[bank_lvl]['capacity']
@@ -1046,12 +1200,12 @@ async def apply_interest():
                 data_handler.save_user_data(user_id, user_data)
                 await user.send(f"Your bank balance has been increased by {interest}% interest. However, your bank balance has reached its maximum capacity of {bank_levels[bank_lvl]['capacity']} coins. Please upgrade your bank to increase its capacity or withdraw coins.")
                 break
-            # round to nearest whole number
             user_data['coin_balance'] = round(user_data['coin_balance'])
             user_data['bank_balance'] = round(user_data['bank_balance'])
             data_handler.save_user_data(user_id, user_data)
             user = await client.fetch_user(user_id)
-            await user.send(f"Your bank balance has been increased by {interest*100}% interest. Your new balance is {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            if user_data['settings']['interest_dm'] == True:
+                await user.send(f"Your bank balance has been increased by {interest*100}% interest. Your new balance is {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
 
 async def wait_until_midnight_pst():
     tz = pytz.timezone('US/Pacific')
@@ -1124,6 +1278,26 @@ async def give(ctx, member: discord.Member, amount: int, type="coins"):
             await ctx.send(f"Gave {member.mention} {amount} coins. You now have {user_data['coin_balance']} coins.")
             return
         return
+
+@client.command()
+async def leaderboard(ctx):
+    users = data_handler.get_all_users()
+    leaderboard = []
+    for user_id in users:
+        user_data = data_handler.get_user_data(user_id)
+        leaderboard.append((user_data['coin_balance'], user_id))
+    leaderboard.sort(reverse=True)
+    leaderboard_str = ''
+    for i, (balance, user_id) in enumerate(leaderboard[:10]):
+        user = await client.fetch_user(user_id)
+        leaderboard_str += f"{i+1}. {user.name} - {balance} coins\n"
+    embed = discord.Embed(
+        title="Leaderboard",
+        description="The top 10 users by coin balance:\n" + leaderboard_str,
+        color=0x00ff00
+    )
+    embed.set_footer(text="Keep making coins to climb the leaderboard!")
+    await ctx.send(embed=embed)
 
 @client.event
 async def on_ready():
