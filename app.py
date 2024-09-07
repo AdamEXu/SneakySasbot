@@ -19,6 +19,7 @@ def zero_hunger_message(user_id):
     user_data['coin_balance'] = user_data['coin_balance'] // 2
     data_handler.save_user_data(user_id, user_data)
     return "You fainted due to lack of food. The raccoon found you and took half of your coins. The raccoon also gave you some cookies to eat. Your hunger bar is now at 2 points."
+
 @client.command()
 async def work(ctx):
   user_id = ctx.author.id
@@ -81,9 +82,16 @@ async def work(ctx):
         work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
         embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
         if user_data['hunger'] == 0:
-            work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}.\n## You are about to faint due to lack of hunger! Consider eating something using `|use [food]`.\nYou will lose half of your coins if you faint."
+            work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. It is almost empty. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
             embed = discord.Embed(title="Work", description=work_message, color=0xffff00)
+            await ctx.reply("You are about to faint due to lack of hunger! Consider eating something using `|use [food]`. You will lose half of your coins if you faint.", embed=embed)
+            return
         await ctx.reply(embed=embed)
+        if user_data['settings']['work_cooldown_ping'] == True:
+            message = await ctx.send(f"I will ping you when you can work again in {calc_cooldown} seconds.")
+            await asyncio.sleep(calc_cooldown)
+            await message.reply(f"{ctx.author.mention}, you can work again! Use `|work` to work again.\n-# If you don't want to be pinged when you can work again, use `|settings` and disable the work cooldown ping setting.")
+
 @client.command()
 async def bal(ctx, user: discord.Member = None, *args):
     if user is None:
