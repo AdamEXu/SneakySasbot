@@ -1,9 +1,10 @@
 import discord
 
 # Migration utilities for updating user data versions
-current_user_data_version = 5
+current_user_data_version = 6
+version = "1.1.0"
 
-help_output = """
+help_output = f"""
 This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
 
 For more information on a specific command, run `|help [command]`.
@@ -27,7 +28,7 @@ Coming soon!
 To change your settings, use `|settings`
 
 If you encounter any problems at all whatsoever, ping <@773996537414942763>.
--# Version 1.0.0
+-# Version {version}
 """
 
 welcome_output = f"""
@@ -262,4 +263,64 @@ command_help = {
   'help': 'View this help message.',
   'meme': 'View a random Sneaky Sasquatch meme. If you would like to submit a meme, DM <@773996537414942763>.',
   'debug': 'Debug command. Do not use. This command is only for debugging purposes.',
+}
+
+alias = {
+  "sausage": "sausage",
+  "orange": "orange",
+  "burger": "burger",
+  "spaghetti": "spaghetti",
+  "spag": "spaghetti",
+  "golfcart": "golfcart",
+  "golf": "golfcart",
+  "car": "car",
+  "sports": "sports",
+  "sportscar": "sports",
+  "super": "super",
+  "supercar": "super",
+  "superbike": "bike",
+  "bike": "bike",
+  "bank": "bank",
+  "food_meter": "food_meter",
+  "foodmeter": "food_meter",
+  "shoes": "shoes",
+  "debug": "debug",
+  "campground": "campground",
+  "fishing": "fishing",
+  "taxi": "taxi",
+  "delivery": "delivery",
+  "newspaper": "newspaper",
+  "paramedic": "paramedic",
+  "police": "police",
+  "doctor": "doctor",
+  "ferry": "ferry",
+  "trash": "trash",
+  "mushroom": "mushroom",
+  "port": "port",
+  "work": "work",
+  "jobs": "jobs",
+  "shop": "shop",
+  "buy": "buy",
+  "bal": "bal",
+  "inv": "inv",
+  "eat": "eat",
+  "use": "use",
+  "stats": "stats",
+  "help": "help"
+}
+
+stat_alias = {
+  "coin": "coin",
+  "coins": "coin",
+  "economy": "coin",
+  "economics": "coin",
+  "money": "coin",
+  "raccoin": "coin",
+  "work": "work",
+  "works": "work",
+  "job": "work",
+  "jobs": "work",
+  "misc": "misc",
+  "miscellaneous": "misc",
+  "other": "misc"
 }

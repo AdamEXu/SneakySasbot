@@ -50,14 +50,27 @@ def ensure_user_in_json(user_id):
         "resets": 0,
         "bad_words": 0,
         "food_eaten": 0,
-        "food_bought": 0
+        "food_bought": 0,
+        "interest_earned": 0,
+        "robbed": 0,
+        "robbed_earned": 0,
+        "robbed_lost": 0,
+        "robbed_failed": 0,
+        "debts": 0,
+        "useless_stat": 0,
+        "coins_given": 0,
+        "coins_received": 0
       },
       "settings": {
         "auto_buy": False,
         "detect_bad_words": False,
-        "interest_dm": True
+        "interest_dm": False,
+        "work_cooldown_ping": False
       },
-      "date_joined": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      "date_joined": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+      "roles": [],
+      "last_command": datetime.datetime.now().timestamp(),
+      "data_version": current_user_data_version
     })
     with open('data.json', 'w') as f:
       json.dump(users, f, indent=2)
@@ -101,7 +114,8 @@ def ensure_user_in_json(user_id):
             user['settings'] = {
               "auto_buy": False,
               "detect_bad_words": False,
-              "interest_dm": True
+              "interest_dm": False,
+              "work_cooldown_ping": False
             }
           if 'stats' not in user:
             print("Migrating user stats")
@@ -134,7 +148,9 @@ def ensure_user_in_json(user_id):
               "robbed_lost": 0,
               "robbed_failed": 0,
               "debts": 0,
-              "useless_stat": 0
+              "useless_stat": 0,
+              "coins_given": 0,
+              "coins_received": 0
             }
             print(user)
             print("User stats migrated")
@@ -143,14 +159,15 @@ def ensure_user_in_json(user_id):
             user['settings'] = {
               "auto_buy": False,
               "detect_bad_words": False,
-              "interest_dm": True
+              "interest_dm": False,
+              "work_cooldown_ping": False
             }
             print("User settings migrated to default values")
           if 'earnings' in user:
             user['stats']['total_coinsearned'] = user['earnings']
             del user['earnings']
           if 'coin_balance' in user and 'stats' in user and 'total_coinsearned' in user['stats'] and user['coin_balance'] > 0 and user['stats']['total_coinsearned'] == 0:
-            user['stats']['total_coinsearned'] += user['coin_balance']
+            user['stats']['total_coinsearned'] = user['coin_balance']
           if user['data_version'] < current_user_data_version:
             print("Migrating user data")
             fields = ['coin_balance', 'work_job', 'last_work', 'vehicles', 'vehicle', 'inventory', 'hunger', 'hunger_max', 'bank_balance', 'bank_lvl', 'earnings', 'shoe_lvl', 'early_tester', 'stats', 'date_joined']
@@ -175,8 +192,23 @@ def ensure_user_in_json(user_id):
             print("Inventory migrated")
           if user['data_version'] < 5:
             print("Migrating user data to version 5")
-            user['settings']['interest_dm'] = True
+            user['settings']['interest_dm'] = False
+          if user['data_version'] < 6:
+            print("Migrating user data to version 6")
+            user['settings']['work_cooldown_ping'] = False
+            user['stats']['coins_given'] = 0
+            user['stats']['coins_received'] = 0
+            user['roles'] = []
+            # last command used in unix time
+            user['last_command'] = datetime.datetime.now().timestamp()
           user['data_version'] = current_user_data_version
+          # go through all user data fields and round them to integers
+          user_number_fields = ["coin_balance", "bank_balance", "hunger", "hunger_max"]
+          user_stat_number_fields = ["total_coinsearned", "total_works", "seconds_worked", "max_coins", "resets", "bad_words", "food_eaten", "food_bought", "interest_earned", "robbed", "robbed_earned", "robbed_lost", "robbed_failed", "debts", "useless_stat", "coins_given", "coins_received"]
+          for field in user_number_fields:
+            user[field] = int(round(user[field]))
+          for field in user_stat_number_fields:
+            user['stats'][field] = int(round(user['stats'][field]))
         except Exception as e:
           print(e)
           return "corrupted"
