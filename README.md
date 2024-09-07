@@ -47,9 +47,9 @@ Ss stats
   - A few new stat counters (these will be at 0)
 - **v1.1.1** - Added new Bank Interest DM setting
 - **v1.1.2** - Improved migration throughout the bot
-- **v1.2.0** - Upcoming Major Release. These features are not yet available through the main bot yet.
-  - New ping after work cooldown setting in `|settings`.
-  -
+- **v1.2.0** - Small QOL changes that were requested:
+  - New ping after work cooldown setting in `|settings`
+  - Improved embeds throughout the bot
 
 ## Progress
 
