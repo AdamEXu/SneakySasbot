@@ -11,8 +11,11 @@ import os
 import base64
 from cryptography.fernet import Fernet
 import ast
+
 intents = discord.Intents.all()
+
 client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>', 'ss ', 'Ss ', 'SS '], description="Test", intents=intents, help_command=None)
+
 def zero_hunger_message(user_id):
     user_data = data_handler.get_user_data(user_id)
     user_data['hunger'] = 2
@@ -96,8 +99,10 @@ async def work(ctx):
 async def bal(ctx, user: discord.Member = None, *args):
     if user is None:
         user = ctx.author
+
     user_id = user.id
     user_in_json = (data_handler.ensure_user_in_json(user_id) == "added")
+
     if user_in_json:
         if user == ctx.author:
             await ctx.reply(welcome_output)
@@ -116,6 +121,7 @@ async def bal(ctx, user: discord.Member = None, *args):
         bank_balance = user_data['bank_balance']
         bank_lvl = user_data['bank_lvl']
         user_publicname = user.display_name
+
         if user_id != ctx.author.id and not masked:
             bank_info = ""
         elif bank_lvl == 0:
@@ -125,16 +131,19 @@ async def bal(ctx, user: discord.Member = None, *args):
             bank_info = f"""**Bank**
             Bank Balance: {bank_balance}
             Bank Level: {bank_lvl}"""
+
         embed = discord.Embed(title=f"{user_publicname}'s Balance", 
                               description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", 
                               color=0x00ff00)
         embed.add_field(name="Total Earnings (Lifetime)", value=user_data['stats']['total_coinsearned'])
         embed.add_field(name="Hunger Bar", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
         await ctx.reply(embed=embed)
+
 @client.command()
 async def inv(ctx, user: discord.Member = None):
     if user is None:
         user = ctx.author
+
     user_id = user.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json == "added":
@@ -145,6 +154,7 @@ async def inv(ctx, user: discord.Member = None):
         return
     elif user_in_json == "corrupted":
         await ctx.reply("# ERROR: Your user data is corrupted. Please contact the bot owner.\nThis is a fatal error and you have lost all of your data. Please DM <@1272666435063251057> **AS SOON AS POSSIBLE** for the possibility of restoring your data. This should hopefully never happen again. Thank you for your understanding.")
+
     user_data = data_handler.get_user_data(user_id)
     masked = False
     if 'mask_user' in user_data:
@@ -156,6 +166,7 @@ async def inv(ctx, user: discord.Member = None):
     inventory_list = ''
     for item in user_data['inventory'].keys():
         inventory_list += f"* {id_to_name[item]} x{user_data['inventory'][item]}\n"
+
     embed = discord.Embed(
         title=f"{user.display_name}'s Inventory",
         description=f"Hunger Bar: {user_data['hunger']} / {user_data['hunger_max']}",
@@ -168,7 +179,9 @@ async def inv(ctx, user: discord.Member = None):
         embed.add_field(name="Vehicles", value=vehicle_list or "No vehicles")
     
     embed.add_field(name="Current Vehicle", value=id_to_name.get(user_data['vehicle'], "None"))
+
     await ctx.reply(embed=embed)
+
 @client.command()
 async def dep(ctx, amount):
     user_id = ctx.author.id
@@ -233,7 +246,7 @@ async def dep(ctx, amount):
             data_handler.save_user_data(user_id, user_data)
             await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
             return
-        
+
 @client.command()
 async def withdraw(ctx, amount):
     user_id = ctx.author.id
@@ -278,6 +291,317 @@ async def withdraw(ctx, amount):
             data_handler.save_user_data(user_id, user_data)
             await ctx.reply(f"Withdrew {amount} coins from your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
             return
+
+@client.command(name='with')
+async def withdraw_command(ctx, amount):
+    await withdraw(ctx, amount)
+
+def create_shop_embed(index, shop, shop_name):
+    item = shop[index]
+    embed = discord.Embed(
+        title=f"{shop_name} - {item['name']}",
+        description=item['description'],
+        color=0x00ff00
+    )
+    embed.add_field(name="Price", value=f"{item['price']} coins")
+    embed.set_footer(text=f"Page {index + 1} of {len(shop)}")
+    return embed
+
+@client.command()
+async def shop(ctx, shop_name=None):
+    if shop_name:
+        if shop_name.lower() == "food" or shop_name.lower() == "foods":
+            await display_food_shop(ctx)
+            return
+        elif shop_name.lower() == "vehicle" or shop_name.lower() == "vehicles" or shop_name.lower() == "car" or shop_name.lower() == "cars":
+            await display_vehicle_shop(ctx)
+            return
+        elif shop_name.lower() == "special" or shop_name.lower() == "specials" or shop_name.lower() == "upgrades" or shop_name.lower() == "upgrade":
+            await display_special_shop(ctx)
+            return
+        else:
+            await ctx.send("Invalid shop name. Please use `|shop` to select a shop.")
+            return
+    embed = discord.Embed(
+        title="Select a Shop",
+        description="Please select a shop by clicking on one of the reactions below:\n\n"
+                    "🍔 Food Shop\n"
+                    "🚗 Vehicle Shop\n"
+                    "✨ Special Shop",
+        color=0x00ff00
+    )
+    embed.set_footer(text="Tip: Next time, you can use |shop [shop name] to directly access a shop. For example, |shop food to access the food shop.")
+
+    message = await ctx.send(embed=embed)
+    await message.add_reaction('🍔')
+    await message.add_reaction('🚗')
+    await message.add_reaction('✨')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🍔', '🚗', '✨']
+
+    try:
+        reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+        if str(reaction.emoji) == '🍔':
+            await message.delete()
+            await display_food_shop(ctx)
+
+        elif str(reaction.emoji) == '🚗':
+            await message.delete()
+            await display_vehicle_shop(ctx)
+
+        elif str(reaction.emoji) == '✨':
+            await message.delete()
+            await display_special_shop(ctx)
+
+    except Exception as e:
+        print(e)
+
+async def display_food_shop(ctx):
+    current_index = 0
+    message = await ctx.send(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=15.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(food_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(food_shop_items)
+                await message.edit(embed=create_shop_embed(current_index, food_shop_items, "Food Shop"))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                item = food_shop_items[current_index]
+                await message.remove_reaction(reaction, user)
+                user_data = data_handler.get_user_data(ctx.author.id)
+                if user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this item.")
+                else:
+                    user_data['coin_balance'] -= item['price']
+                    if item['id'] in user_data['inventory']:
+                        user_data['inventory'][item['id']] += 1
+                    else:
+                        user_data['inventory'][item['id']] = 1
+                    user_data['stats']['food_bought'] += 1
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins!")
+        except Exception as e:
+            print(e)
+            break
+
+def create_vehicle_embed(user_id, index):
+    item = vehicle_shop_items[index]
+    user_info = data_handler.get_user_data(user_id)
+    if item["id"] == user_info["vehicle"]:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Owned", value="Currently equipped as your active vehicle.")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+    elif item["id"] in user_info["vehicles"]:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Owned", value=f"Click 💰 to equip it as your current vehicle and gain its bonus.")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+    else:
+        embed = discord.Embed(
+            title=f"Vehicle Shop - {item['name']}",
+            description=item['description'],
+            color=0x00ff00
+        )
+        embed.add_field(name="Price", value=f"This vehicle costs {item['price']} coins")
+        embed.set_footer(text=f"Page {index + 1} of {len(vehicle_shop_items)}")
+        return embed
+
+async def display_vehicle_shop(ctx):
+    current_index = 0
+    message = await ctx.send(embed=create_vehicle_embed(ctx.author.id, current_index))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(vehicle_shop_items)
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(vehicle_shop_items)
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                item = vehicle_shop_items[current_index]
+                await message.remove_reaction(reaction, user)
+                user_data = data_handler.get_user_data(ctx.author.id)
+                if user_data['vehicle'] == item['id']:
+                    await ctx.send(f"You already own and equipped {item['name']} as your active vehicle.")
+                elif item['id'] in user_data['vehicles']:
+                    user_data['vehicle'] = item['id']
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"Equipped {item['name']} as your active vehicle.")
+                elif user_data['coin_balance'] < item['price']:
+                    await ctx.send("You do not have enough coins to purchase this vehicle.")
+                else:
+                    user_data['coin_balance'] -= item['price']
+                    user_data['vehicles'].append(item['id'])
+                    user_data['vehicle'] = item['id']
+                    data_handler.save_user_data(ctx.author.id, user_data)
+                    await ctx.send(f"You have purchased {item['name']} for {item['price']} coins! It is now your active vehicle.\n-# To switch vehicles, use the shop and click buy on the vehicle (it won't charge you again if you already own it).")
+                await message.edit(embed=create_vehicle_embed(ctx.author.id, current_index))
+        except Exception as e:
+            break
+
+upgrades = ["bank", "foodmeter", "shoes"]
+def upgrade_shop_embed(user_id, shop_name, user_data):
+    if shop_name == "bank":
+        # get current bank level
+        bank_lvl = user_data['bank_lvl']
+        # get information about the current and next bank level
+        current_bank_info = bank_levels[bank_lvl]
+        if bank_lvl == len(bank_levels) - 1:
+            embed = discord.Embed(
+                title="Bank Account",
+                description=f"The bank allows you to store coins safely and prevent them from being stolen. If you pass out from hunger, your bank balance will not be affected. If someone uses `|steal` on you, your bank balance is protected. Upgrade your bank to increase its capacity.",
+                color=0x00ff00
+            )
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins")
+            embed.add_field(name="Next Level", value="You have reached the maximum bank level. Check back later to see if more levels have been added.")
+            embed.set_footer(text="Page 1 of 3")
+            return embed
+        next_bank_info = bank_levels[bank_lvl + 1]
+        embed = discord.Embed(
+            title="Bank Account",
+            description=f"The bank allows you to store coins safely and prevent them from being stolen. If you pass out from hunger, your bank balance will not be affected. If someone uses `|steal` on you, your bank balance is protected. Upgrade your bank to increase its capacity.",
+            color=0x00ff00
+        )
+        if current_bank_info['interest'] > 0:
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins\n**Interest**: {current_bank_info['interest']*100}% per day")
+        else:
+            embed.add_field(name="Current Level", value=f"{current_bank_info['description']}\n**Capacity**: {user_data['bank_balance']} / {current_bank_info['capacity']} coins")
+        if next_bank_info['interest'] > 0:
+            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins\n**Interest**: {next_bank_info['interest']*100}% per day")
+        else:
+            embed.add_field(name="Next Level", value=f"{next_bank_info['description']}\n**Capacity**: {next_bank_info['capacity']} coins\n**Upgrade Cost**: {next_bank_info['price']} coins")
+        embed.set_footer(text="Page 1 of 3")
+        return embed
+    elif shop_name == "foodmeter":
+        embed = discord.Embed(
+            title="Food Meter",
+            description="Every time you work, your food meter goes down by 1 point. If it reaches 0, you will faint and lose half of your coins and half of your inventory. Upgrade your food meter to increase its capacity and ensure you don't run out of food.",
+            color=0x00ff00
+        )
+        user_maxhunger = user_data['hunger_max']
+        hunger_level = user_maxhunger - 6
+        current_hunger_info = hunger_levels[hunger_level]
+        if hunger_level == len(hunger_levels) - 1:
+            embed.add_field(name="Current Level", value=f"{current_hunger_info['description']}\n**Capacity**: {user_data['hunger']} / {user_maxhunger} points")
+            embed.add_field(name="Next Level", value="You have reached the maximum food meter level. Check back later to see if more levels have been added.")
+            embed.set_footer(text="Page 2 of 3")
+            return embed
+        next_hunger_info = hunger_levels[hunger_level + 1]
+        embed.add_field(name="Current Level", value=f"{current_hunger_info['description']}\n**Capacity**: {user_data['hunger']} / {user_maxhunger} points")
+        embed.add_field(name="Next Level", value=f"{next_hunger_info['description']}\n**Capacity**: {next_hunger_info['capacity']} points\n**Upgrade Cost**: {next_hunger_info['price']} coins")
+        embed.set_footer(text="Page 2 of 3")
+        return embed
+    elif shop_name == "shoes":
+        embed = discord.Embed(
+            title="Coming soon...",
+            description="Coming soon!",
+            color=0x00ff00
+        )
+        embed.set_footer(text="Page 3 of 3")
+        return embed
+
+async def display_special_shop(ctx):
+    current_index = 0
+    message = await ctx.send(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+
+    await message.add_reaction('⬅️')
+    await message.add_reaction('💰')
+    await message.add_reaction('➡️')
+
+    def check(reaction, user):
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['⬅️', '➡️', '💰']
+
+    while True:
+        try:
+            reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
+
+            if str(reaction.emoji) == '⬅️':
+                current_index = (current_index - 1) % len(special_shop_items)
+                await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '➡️':
+                current_index = (current_index + 1) % len(special_shop_items)
+                await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                await message.remove_reaction(reaction, user)
+
+            elif str(reaction.emoji) == '💰':
+                await message.remove_reaction(reaction, user)
+                if upgrades[current_index] == "bank":
+                    user_data = data_handler.get_user_data(ctx.author.id)
+                    bank_lvl = user_data['bank_lvl']
+                    if bank_lvl == len(bank_levels) - 1:
+                        await ctx.send("You already have the maximum bank level. Check back later to see if more levels have been added.")
+                    else:
+                        next_bank_info = bank_levels[bank_lvl + 1]
+                        if user_data['coin_balance'] < next_bank_info['price']:
+                            await ctx.send("You do not have enough coins to upgrade your bank. Keep working to earn more coins!")
+                        else:
+                            user_data['coin_balance'] -= next_bank_info['price']
+                            user_data['bank_lvl'] += 1
+                            data_handler.save_user_data(ctx.author.id, user_data)
+                            await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                            await ctx.send(f"You have upgraded your bank to level {bank_lvl + 1}!")
+                elif upgrades[current_index] == "foodmeter":
+                    user_data = data_handler.get_user_data(ctx.author.id)
+                    user_maxhunger = user_data['hunger_max']
+                    hunger_level = user_maxhunger - 6
+                    if hunger_level == len(hunger_levels) - 1:
+                        await ctx.send("You already have the maximum food meter level. Check back later to see if more levels have been added.")
+                    else:
+                        next_hunger_info = hunger_levels[hunger_level + 1]
+                        if user_data['coin_balance'] < next_hunger_info['price']:
+                            await ctx.send("You do not have enough coins to upgrade your food meter. Keep working to earn more coins!")
+                        else:
+                            user_data['coin_balance'] -= next_hunger_info['price']
+                            user_data['hunger_max'] += 1
+                            data_handler.save_user_data(ctx.author.id, user_data)
+                            await message.edit(embed=upgrade_shop_embed(ctx.author.id, upgrades[current_index], data_handler.get_user_data(ctx.author.id)))
+                            await ctx.send(f"You have upgraded your food meter to level {hunger_level + 1}! Food not included. Buy food from the shop to fill that expanded hunger meter! Your current hunger bar: {user_data['hunger']} / {user_data['hunger_max']}")
+        except Exception as e:
+            print(e)
+            break
 
 def create_job_embed(index):
     job = jobs_list[index]
@@ -697,10 +1021,6 @@ def generate_settings_embed(user_id):
         embed.add_field(name="Auto Buy 💰", value="Forget about buying food! When you run `|eat` and don't have the food item in your inventory, it will automatically buy it.\nEnabled ✅")
     else:
         embed.add_field(name="Auto Buy 💰", value="Forget about buying food! When you run `|eat` and don't have the food item in your inventory, it will automatically buy it.\nDisabled ❌")
-    if user_settings['work_cooldown_ping'] == True:
-        embed.add_field(name="Work Cooldown Ping 💼", value="Receive a ping when your work cooldown is over and you can work again.\nEnabled ✅")
-    else:
-        embed.add_field(name="Work Cooldown Ping 💼", value="Receive a ping when your work cooldown is over and you can work again.\nDisabled ❌")
     embed.set_footer(text="Page 1 of 1")
     return embed
 
@@ -712,9 +1032,8 @@ async def settings(ctx):
     await message.add_reaction('🤬')
     await message.add_reaction('🔔')
     await message.add_reaction('💰')
-    await message.add_reaction('💼')
     def check(reaction, user):
-        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🤬', '💰', '🔔', '💼']
+        return user == ctx.author and reaction.message.id == message.id and str(reaction.emoji) in ['🤬', '💰', '🔔']
     while True:
         try:
             reaction, user = await client.wait_for('reaction_add', timeout=60.0, check=check)
@@ -725,8 +1044,6 @@ async def settings(ctx):
                 user_data['settings']['interest_dm'] = not user_data['settings']['interest_dm']
             elif str(reaction.emoji) == '💰':
                 user_data['settings']['auto_buy'] = not user_data['settings']['auto_buy']
-            elif str(reaction.emoji) == '💼':
-                user_data['settings']['work_cooldown_ping'] = not user_data['settings']['work_cooldown_ping']
             data_handler.save_user_data(ctx.author.id, user_data)
             await message.edit(embed=generate_settings_embed(ctx.author.id))
         except Exception as e:
@@ -734,7 +1051,6 @@ async def settings(ctx):
 
 @client.command()
 async def stats(ctx, stat_book=None, user: discord.Member = None):
-    stat_book = stat_alias[stat_book] if stat_book in stat_alias else None
     if user is None:
         user = ctx.author
     user_id = user.id
@@ -961,16 +1277,11 @@ async def give(ctx, member: discord.Member, amount: int, type="coins"):
                 return
             user_data = data_handler.get_user_data(member.id)
             user_data['coin_balance'] += amount
-            user_data['stats']['total_coinsearned'] += amount
-            user_data['stats']['coins_received'] += amount
-            if user_data['coin_balance'] > user_data['stats']['max_coins']:
-                user_data['stats']['max_coins'] = user_data['coin_balance']
             data_handler.save_user_data(member.id, user_data)
             user_data = data_handler.get_user_data(user_id)
             user_data['coin_balance'] -= amount
-            user_data['stats']['coins_given'] += amount
             data_handler.save_user_data(user_id, user_data)
-            await ctx.send(f"You gave {member.mention} {amount} coins. You now have {user_data['coin_balance']} coins.")
+            await ctx.send(f"Gave {member.mention} {amount} coins. You now have {user_data['coin_balance']} coins.")
             return
         return
 
@@ -998,6 +1309,5 @@ async def leaderboard(ctx):
 async def on_ready():
     print(f'{client.user} is connected and ready!')
     await wait_until_midnight_pst()
-    # apply_interest.start()
 
 client.run(os.getenv('TOKEN'))
