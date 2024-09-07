@@ -954,6 +954,11 @@ async def on_message(ctx):
     if ctx.guild is None and ctx.author.id != 773996537414942763:
         await ctx.reply("This bot will not work in DMs. Consider adding it to your server.", embed=bot_dm_embed)
         return
+    if ctx.guild == 1275610612340097139:
+        embed = discord.Embed(title="Adobe Creative Cloud", description="This bot is not authorized to be used in this server. Please purchase an official license at [this link](https://adobe.com/creativecloud/plans.html) to continue.", color=0xff0000)
+        embed.set_image(url="https://community.adobe.com/legacyfs/online/1117537_Screen%20Shot%202017-01-29%20at%208.44.09%20PM.png")
+        await ctx.reply("Please purchase an official license at [this link](https://adobe.com/creativecloud/plans.html) to continue.", embed=embed)
+        return
     if ctx.channel.id != 1279662904806998147 and os.environ.get('DEBUG') == "True":
         return
     user_data = data_handler.get_user_data(ctx.author.id)
