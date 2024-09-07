@@ -1,6 +1,5 @@
 import asyncio
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 import data_handler
 import datetime
@@ -12,109 +11,90 @@ import os
 import base64
 from cryptography.fernet import Fernet
 import ast
-
 intents = discord.Intents.all()
-client = commands.Bot(command_prefix='/', intents=intents)
-
-@client.event
-async def on_ready():
-    print(f'We have logged in as {client.user}')
-    try:
-        synced = await client.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
-    except Exception as e:
-        print(e)
-
+client = commands.Bot(command_prefix=['|', 'sneak ', 'Sneak ', 'SNEAK ', '<@1272666435063251057> ', '<@1272666435063251057>', 'ss ', 'Ss ', 'SS '], description="Test", intents=intents, help_command=None)
 def zero_hunger_message(user_id):
     user_data = data_handler.get_user_data(user_id)
     user_data['hunger'] = 2
-    user_data['coin_balance'] = int(user_data['coin_balance'] // 2)
+    user_data['coin_balance'] = user_data['coin_balance'] // 2
     data_handler.save_user_data(user_id, user_data)
     return "You fainted due to lack of food. The raccoon found you and took half of your coins. The raccoon also gave you some cookies to eat. Your hunger bar is now at 2 points."
-
-@client.tree.command(name="work", description="Work to earn coins")
-async def work(interaction: discord.Interaction):
-    user_id = interaction.user.id
-    user_in_json = data_handler.ensure_user_in_json(user_id)
-    if user_in_json == "added":
-        await interaction.response.send_message(welcome_output)
-    else:
+@client.command()
+async def work(ctx):
+  user_id = ctx.author.id
+  user_in_json = data_handler.ensure_user_in_json(user_id)
+  if user_in_json == "added":
+    await ctx.reply(welcome_output)
+  else:
+    user_data = data_handler.get_user_data(user_id)
+    if 'mask_user' in user_data:
+        user_id = user_data['mask_user']
         user_data = data_handler.get_user_data(user_id)
-        if 'mask_user' in user_data:
-            user_id = user_data['mask_user']
-            user_data = data_handler.get_user_data(user_id)
-            user = await client.fetch_user(user_id)
-        user_job = user_data['work_job']
-        last_work = user_data['last_work']
-        job_data = data_handler.get_job_data(user_job)
-        user_vehicle = user_data['vehicle']
-        vehicle_modifer = 1
-        calc_cooldown = job_data['cooldown']
-        if user_vehicle != '':
-            vehicle_modifer = vehicle_modifers[user_vehicle]
-            calc_cooldown = job_data['cooldown'] * vehicle_modifer
-        boost_message = ""
-        if vehicle_modifer < 1:
-            rounded_modifer = round((1 - vehicle_modifer) * 100)
-            boost_message = f"Your {id_to_name[user_vehicle]} is boosting your cooldown by {rounded_modifer}%!"
-        
-        if last_work + calc_cooldown > datetime.datetime.now().timestamp():
-            time_stamp = datetime.datetime.fromtimestamp(last_work + calc_cooldown)
-            time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
-            embed = discord.Embed(title="Work", description=f"Not so fast! You can work again {time_stamp}.\n{boost_message}", color=0xff0000)
-            await interaction.response.send_message(embed=embed)
-        else:
-            time_now = datetime.datetime.now()
-            time_stamp = time_now + datetime.timedelta(seconds=calc_cooldown)
-            time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
-            earning_min = job_data['earning_min']
-            earning_max = job_data['earning_max']
-            earnings = random.randint(earning_min, earning_max)
-            user_data['last_work'] = datetime.datetime.now().timestamp()
-            user_data['coin_balance'] += earnings
-            user_data['stats']['total_coinsearned'] += earnings
-            user_data['stats']['total_works'] += 1
-            user_data['stats']['works'][user_job] += 1
-            user_data['stats']['seconds_worked'] += calc_cooldown
-            if user_data['stats']['max_coins'] < user_data['coin_balance']:
-                user_data['stats']['max_coins'] = user_data['coin_balance']
-            user_data['hunger'] -= 1
-            if user_data['hunger'] < 0:
-                reply_answer = zero_hunger_message(user_data['id'])
-                embed = discord.Embed(title="Fainted", color=0xff0000)
-                embed.add_field(name="Hunger", value=f'2 / {user_data["hunger_max"]}')
-                embed.add_field(name="Coins", value=f'{user_data["coin_balance"]}')
-                embed.set_footer(text="Make sure to eat something using `/use [food]` to prevent this from happening again! Stock up on food by using `/shop food`.")
-                await interaction.response.send_message(reply_answer, embed=embed)
-                return
-            data_handler.save_user_data(user_id, user_data)
-            random_work_messages = work_messages[user_data['work_job']]
-            random_work_message = random.choice(random_work_messages)
-            work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
-            embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
-            if user_data['hunger'] == 0:
-                work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. It is almost empty. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
-                embed = discord.Embed(title="Work", description=work_message, color=0xffff00)
-                await interaction.response.send_message("You are about to faint due to lack of hunger! Consider eating something using `/use [food]`. You will lose half of your coins if you faint.", embed=embed)
-                return
-            await interaction.response.send_message(embed=embed)
-            if user_data['settings']['work_cooldown_ping'] == True:
-                await asyncio.sleep(calc_cooldown)
-                await interaction.followup.send(f"{interaction.user.mention}, you can work again! Use `/work` to work again.\n-# If you don't want to be pinged when you can work again, use `/settings` and disable the work cooldown ping setting.")
-
-@client.tree.command(name="balance", description="Check your balance")
-async def balance(interaction: discord.Interaction, user: discord.Member = None):
+        user = await client.fetch_user(user_id)
+    user_job = user_data['work_job']
+    last_work = user_data['last_work']
+    job_data = data_handler.get_job_data(user_job)
+    user_vehicle = user_data['vehicle']
+    vehicle_modifer = 1
+    calc_cooldown = job_data['cooldown']
+    if user_vehicle != '':
+        vehicle_modifer = vehicle_modifers[user_vehicle]
+        calc_cooldown = job_data['cooldown'] * vehicle_modifer
+    boost_message = ""
+    if vehicle_modifer < 1:
+        rounded_modifer = round((1 - vehicle_modifer) * 100)
+        boost_message = f"Your {id_to_name[user_vehicle]} is boosting your cooldown by {rounded_modifer}%!"
+    # time_stamp = f"<t:{round(datetime.datetime.now() + calc_cooldown)}:R>"
+    # time until next work
+    if last_work + calc_cooldown > datetime.datetime.now().timestamp():
+        time_stamp = datetime.datetime.fromtimestamp(last_work + calc_cooldown)
+        time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
+        embed = discord.Embed(title="Work", description=f"Not so fast! You can work again {time_stamp}.\n{boost_message}", color=0xff0000)
+        await ctx.reply(embed=embed)
+    else:
+        time_now = datetime.datetime.now()
+        time_stamp = time_now + datetime.timedelta(seconds=calc_cooldown)
+        time_stamp = f'<t:{int(time_stamp.timestamp())}:R>'
+        earning_min = job_data['earning_min']
+        earning_max = job_data['earning_max']
+        earnings = random.randint(earning_min, earning_max)
+        user_data['last_work'] = datetime.datetime.now().timestamp()
+        user_data['coin_balance'] += earnings
+        user_data['stats']['total_coinsearned'] += earnings
+        user_data['stats']['total_works'] += 1
+        user_data['stats']['works'][user_job] += 1
+        user_data['stats']['seconds_worked'] += calc_cooldown
+        if user_data['stats']['max_coins'] < user_data['coin_balance']:
+            user_data['stats']['max_coins'] = user_data['coin_balance']
+        user_data['hunger'] -= 1
+        if user_data['hunger'] < 0:
+            reply_answer = zero_hunger_message(user_data['id'])
+            embed = discord.Embed(title="Fainted", color=0xff0000)
+            embed.add_field(name="Hunger", value=f'2 / {user_data["hunger_max"]}')
+            embed.add_field(name="Coins", value=f'{user_data["coin_balance"]}')
+            embed.set_footer(text="Make sure to eat something using `|use [food]` to prevent this from happening again! Stock up on food by using `|shop food`.")
+            await ctx.reply(reply_answer, embed=embed)
+            return
+        data_handler.save_user_data(user_id, user_data)
+        random_work_messages = work_messages[user_data['work_job']]
+        random_work_message = random.choice(random_work_messages)
+        work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}."
+        embed = discord.Embed(title="Work", description=work_message, color=0x00ff00)
+        if user_data['hunger'] == 0:
+            work_message = f"{random_work_message}\n\nYour earnings: <:coin:1273754255433531565> **{earnings}**\nYou can work again {time_stamp}.\n{boost_message}\n\nYour hunger bar has decreased by 1 point. Current hunger: {user_data['hunger']} / {user_data['hunger_max']}.\n## You are about to faint due to lack of hunger! Consider eating something using `|use [food]`.\nYou will lose half of your coins if you faint."
+            embed = discord.Embed(title="Work", description=work_message, color=0xffff00)
+        await ctx.reply(embed=embed)
+@client.command()
+async def bal(ctx, user: discord.Member = None, *args):
     if user is None:
-        user = interaction.user
-
+        user = ctx.author
     user_id = user.id
-    user_in_json = data_handler.ensure_user_in_json(user_id)
-
-    if user_in_json == "added":
-        if user == interaction.user:
-            await interaction.response.send_message(welcome_output)
+    user_in_json = (data_handler.ensure_user_in_json(user_id) == "added")
+    if user_in_json:
+        if user == ctx.author:
+            await ctx.reply(welcome_output)
         else:
-            await interaction.response.send_message("This user hasn't used the bot yet. Perhaps ask them to run a command?")
+            await ctx.reply("This user hasn't used the bot yet. Perhaps ask them to run a command?")
     else:
         user_data = data_handler.get_user_data(user_id)
         masked = False
@@ -126,43 +106,37 @@ async def balance(interaction: discord.Interaction, user: discord.Member = None)
             user = await client.fetch_user(user_id)
         balance = user_data['coin_balance']
         bank_balance = user_data['bank_balance']
-        bank_capacity = bank_levels[user_data['bank_lvl']]['capacity']
         bank_lvl = user_data['bank_lvl']
         user_publicname = user.display_name
-
-        if user_id != interaction.user.id and not masked:
+        if user_id != ctx.author.id and not masked:
             bank_info = ""
         elif bank_lvl == 0:
             bank_info = f"""**Bank**
-            You haven't unlocked the bank yet. See the `/shop` for more information."""
+            You haven't unlocked the bank yet. See the `|shop` for more information."""
         else:
             bank_info = f"""**Bank**
-            Bank Balance: {bank_balance} / {bank_capacity} coins
+            Bank Balance: {bank_balance}
             Bank Level: {bank_lvl}"""
-
         embed = discord.Embed(title=f"{user_publicname}'s Balance", 
                               description=f"""**Coin Balance**\n{balance}\n\n{bank_info}""", 
                               color=0x00ff00)
         embed.add_field(name="Total Earnings (Lifetime)", value=user_data['stats']['total_coinsearned'])
         embed.add_field(name="Hunger Bar", value=f"{user_data['hunger']} / {user_data['hunger_max']}")
-        await interaction.response.send_message(embed=embed)
-
-@client.tree.command(name="inventory", description="Check your inventory")
-async def inventory(interaction: discord.Interaction, user: discord.Member = None):
+        await ctx.reply(embed=embed)
+@client.command()
+async def inv(ctx, user: discord.Member = None):
     if user is None:
-        user = interaction.user
-
+        user = ctx.author
     user_id = user.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json == "added":
-        if user == interaction.user:
-            await interaction.response.send_message(welcome_output)
+        if user == ctx.author:
+            await ctx.reply(welcome_output)
         else:
-            await interaction.response.send_message(f"{user.display_name} hasn't used the bot yet.")
+            await ctx.reply(f"{user.display_name} hasn't used the bot yet.")
         return
     elif user_in_json == "corrupted":
-        await interaction.response.send_message("# ERROR: Your user data is corrupted. Please contact the bot owner.\nThis is a fatal error and you have lost all of your data. Please DM <@1272666435063251057> **AS SOON AS POSSIBLE** for the possibility of restoring your data. This should hopefully never happen again. Thank you for your understanding.")
-
+        await ctx.reply("# ERROR: Your user data is corrupted. Please contact the bot owner.\nThis is a fatal error and you have lost all of your data. Please DM <@1272666435063251057> **AS SOON AS POSSIBLE** for the possibility of restoring your data. This should hopefully never happen again. Thank you for your understanding.")
     user_data = data_handler.get_user_data(user_id)
     masked = False
     if 'mask_user' in user_data:
@@ -174,7 +148,6 @@ async def inventory(interaction: discord.Interaction, user: discord.Member = Non
     inventory_list = ''
     for item in user_data['inventory'].keys():
         inventory_list += f"* {id_to_name[item]} x{user_data['inventory'][item]}\n"
-
     embed = discord.Embed(
         title=f"{user.display_name}'s Inventory",
         description=f"Hunger Bar: {user_data['hunger']} / {user_data['hunger_max']}",
@@ -182,20 +155,18 @@ async def inventory(interaction: discord.Interaction, user: discord.Member = Non
     )
     embed.add_field(name="Food Items", value=inventory_list or "No items")
     
-    if user == interaction.user or masked:
+    if user == ctx.author or masked:
         vehicle_list = "\n".join(f"* {id_to_name[vehicle]}" for vehicle in user_data['vehicles'])
         embed.add_field(name="Vehicles", value=vehicle_list or "No vehicles")
     
     embed.add_field(name="Current Vehicle", value=id_to_name.get(user_data['vehicle'], "None"))
-
-    await interaction.response.send_message(embed=embed)
-
-@client.tree.command(name="deposit", description="Deposit coins into your bank")
-async def deposit(interaction: discord.Interaction, amount: str):
-    user_id = interaction.user.id
+    await ctx.reply(embed=embed)
+@client.command()
+async def dep(ctx, amount):
+    user_id = ctx.author.id
     user_in_json = data_handler.ensure_user_in_json(user_id)
     if user_in_json == "added":
-        await interaction.response.send_message(welcome_output)
+        await ctx.reply(welcome_output)
     else:
         user_data = data_handler.get_user_data(user_id)
         if 'mask_user' in user_data:
@@ -203,58 +174,102 @@ async def deposit(interaction: discord.Interaction, amount: str):
             user_data = data_handler.get_user_data(user_id)
             user = await client.fetch_user(user_id)
         if user_data['bank_lvl'] == 0:
-            await interaction.response.send_message("You haven't unlocked the bank yet. See the `/shop` for more information.")
+            await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
             return
         if amount.lower() == "all":
             amount = user_data['coin_balance']
             if amount == 0:
-                await interaction.response.send_message("You do not have any coins to deposit.")
+                await ctx.reply("You do not have any coins to deposit.")
                 return
             if amount > bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']:
                 amount = bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']
                 if amount == 0:
-                    await interaction.response.send_message("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
+                    await ctx.reply("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
                     return
                 else:
                     user_data['coin_balance'] -= amount
                     user_data['bank_balance'] += amount
                     data_handler.save_user_data(user_id, user_data)
-                    await interaction.response.send_message(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+                    await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
                     return
             else:
                 user_data['coin_balance'] -= amount
                 user_data['bank_balance'] += amount
                 data_handler.save_user_data(user_id, user_data)
-                await interaction.response.send_message(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+                await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
                 return
         else:
             if not amount.isdigit():
-                await interaction.response.send_message("Please enter a valid number to deposit.")
+                await ctx.reply("Please enter a valid number to deposit.")
                 return
             amount = int(amount)
             if user_data['bank_lvl'] == 0:
-                await interaction.response.send_message("You haven't unlocked the bank yet. See the `/shop` for more information.")
+                await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
                 return
             if amount <= 0:
-                await interaction.response.send_message("Please enter a valid number to deposit.")
+                await ctx.reply("Please enter a valid number to deposit.")
                 return
             if amount > user_data['coin_balance']:
-                await interaction.response.send_message("You do not have enough coins to deposit.")
+                await ctx.reply("You do not have enough coins to deposit.")
                 return
             if amount > bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']:
                 amount = bank_levels[user_data['bank_lvl']]['capacity'] - user_data['bank_balance']
                 if amount == 0:
-                    await interaction.response.send_message("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
+                    await ctx.reply("Your bank is full. You cannot deposit any more coins. Consider upgrading your bank.")
                     return
                 else:
-                    await interaction.response.send_message(f"There is not enough space in your bank to deposit {amount} coins.")
+                    await ctx.reply(f"There is not enough space in your bank to deposit {amount} coins.")
                     return
             user_data['coin_balance'] -= amount
             user_data['bank_balance'] += amount
             data_handler.save_user_data(user_id, user_data)
-            await interaction.response.send_message(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
-
-
+            await ctx.reply(f"Deposited {amount} coins into your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
+        
+@client.command()
+async def withdraw(ctx, amount):
+    user_id = ctx.author.id
+    user_in_json = data_handler.ensure_user_in_json(user_id)
+    if user_in_json == "added":
+        await ctx.reply(welcome_output)
+    else:
+        user_data = data_handler.get_user_data(user_id)
+        if 'mask_user' in user_data:
+            user_id = user_data['mask_user']
+            user_data = data_handler.get_user_data(user_id)
+            user = await client.fetch_user(user_id)
+        if user_data['bank_lvl'] == 0:
+            await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+            return
+        if amount.lower() == "all":
+            amount = user_data['bank_balance']
+            if amount == 0:
+                await ctx.reply("You do not have any coins to withdraw.")
+                return
+            user_data['coin_balance'] += amount
+            user_data['bank_balance'] = 0
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.reply(f"Withdrew {amount} coins from your bank. Your bank balance is now 0 / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
+        else:
+            if not amount.isdigit():
+                await ctx.reply("Please enter a valid number to withdraw.")
+                return
+            amount = int(amount)
+            if amount <= 0:
+                await ctx.reply("Please enter a valid number to withdraw.")
+                return
+            if user_data['bank_lvl'] == 0:
+                await ctx.reply("You haven't unlocked the bank yet. See the `|shop` for more information.")
+                return
+            if amount > user_data['bank_balance']:
+                await ctx.reply("You do not have enough coins to withdraw.")
+                return
+            user_data['coin_balance'] += amount
+            user_data['bank_balance'] -= amount
+            data_handler.save_user_data(user_id, user_data)
+            await ctx.reply(f"Withdrew {amount} coins from your bank. Your bank balance is now {user_data['bank_balance']} / {bank_levels[user_data['bank_lvl']]['capacity']} coins.")
+            return
 
 def create_job_embed(index):
     job = jobs_list[index]

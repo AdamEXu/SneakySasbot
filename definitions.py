@@ -3,6 +3,45 @@ import discord
 # Migration utilities for updating user data versions
 current_user_data_version = 6
 version = "1.1.0"
+# - **v0.1.0** - Initial release. Added economy system with balance, shop, inventory, and work commands. Added jobs command.
+# - **v0.2.0** - Improved shop, fixed many errors in commands, and improved error handling. Also, added the food meter.
+# - **v0.3.0** - Special shop release! Now you can upgrade your bank account and food meter. Vehicles are working now!
+# - **v0.4.0** - You can now use certain commands on other users.
+# - **v0.5.0** - Added some behind the scenes stat counters, but they're not ready to release yet (a lot of places where it isn't counting!)
+# - **v0.5.1** - Looks like the stat counters broke a ton of stuff so it should be good to go now!
+# - **v0.5.2** - More fixing of stat counters haha.
+# - **v0.5.3** - Some jobs were affected by the stat counter change.
+# - **v0.5.4** - Patched up a lot of holes where it wouldn't count stats.
+# - **v1.0.0** - First release! New bot account because couldn't figure out how to get some things working on the old account haha.
+# - **v1.0.1** - Fixed a ton of rounding errors throughout the bot
+# - **v1.1.0** - FIRST MAJOR UPDATE! Many new features released:
+#   - New `|stats` command to see your stats.
+#   - New `|settings` command to edit some portions of the bot's functionality.
+#   - The game's bad word filter was also imported into the bot as a funny setting.
+#   - A few new stat counters (these will be at 0)
+# - **v1.1.1** - Added new Bank Interest DM setting
+# - **v1.1.2** - Improved migration throughout the bot
+# - **v1.2.0** - Small QOL changes that were requested:
+#   - New ping after work cooldown setting in `|settings`.
+#   - Improved embeds throughout the bot.
+versions = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.5.1", "0.5.2", "0.5.3", "0.5.4", "1.0.0", "1.0.1", "1.1.0", "1.1.1", "1.1.2", "1.2.0"]
+changelog = {
+  "0.1.0": "Initial release. Added economy system with balance, shop, inventory, and work commands. Added jobs command.",
+  "0.2.0": "Improved shop, fixed many errors in commands, and improved error handling. Also, added the food meter.",
+  "0.3.0": "Special shop release! Now you can upgrade your bank account and food meter. Vehicles are working now!",
+  "0.4.0": "You can now use certain commands on other users.",
+  "0.5.0": "Added some behind the scenes stat counters, but they're not ready to release yet (a lot of places where it isn't counting!)",
+  "0.5.1": "Looks like the stat counters broke a ton of stuff so it should be good to go now!",
+  "0.5.2": "More fixing of stat counters haha.",
+  "0.5.3": "Some jobs were affected by the stat counter change.",
+  "0.5.4": "Patched up a lot of holes where it wouldn't count stats.",
+  "1.0.0": "First release! New bot account because couldn't figure out how to get some things working on the old account haha.",
+  "1.0.1": "Fixed a ton of rounding errors throughout the bot",
+  "1.1.0": "FIRST MAJOR UPDATE! Many new features released: New `|stats` command to see your stats. New `|settings` command to edit some portions of the bot's functionality. The game's bad word filter was also imported into the bot as a funny setting. A few new stat counters (these will be at 0)",
+  "1.1.1": "Added new Bank Interest DM setting",
+  "1.1.2": "Improved migration throughout the bot",
+  "1.2.0": "Small QOL changes that were requested: New ping after work cooldown setting in `|settings`. Improved embeds throughout the bot."
+}
 
 help_output = f"""
 This is Adam The Great's interpretation of Sasbot. It contains an economy, and some fun commands.
